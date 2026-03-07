@@ -1,0 +1,80 @@
+name: 🌐 Deploy Download Page
+
+on:
+  # Run after APK build completes
+  workflow_run:
+    workflows: ["🌾 Build Krishi AI APK"]
+    types:
+      - completed
+  # Also allow manual trigger
+  workflow_dispatch:
+  # Also run on push to main if download page changed
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+
+jobs:
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 🚀 Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Get the latest build URL from EAS
+      - name: 🔗 Get latest APK download URL
+        id: get_url
+        run: |
+          BUILD_URL=$(eas build:list \
+            --platform android \
+            --status finished \
+            --limit 1 \
+            --json \
+            --non-interactive 2>/dev/null | \
+            node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); try { const b=JSON.parse(d); console.log(b[0]?.artifacts?.buildUrl || ''); } catch(e) { console.log(''); }")
+          echo "BUILD_URL=$BUILD_URL" >> $GITHUB_OUTPUT
+          echo "Latest APK URL: $BUILD_URL"
+
+      # Copy web folder and inject real APK URL
+      - name: 📄 Prepare download page
+        run: |
+          mkdir -p dist
+          cp web/index.html dist/index.html
+          BUILD_URL="${{ steps.get_url.outputs.BUILD_URL }}"
+          if [ -n "$BUILD_URL" ]; then
+            # Replace placeholder APK href with real EAS download URL
+            sed -i "s|./krishi-ai-v2.1.0.apk|$BUILD_URL|g" dist/index.html
+            echo "✅ Injected real APK URL: $BUILD_URL"
+          else
+            echo "⚠️ No APK URL found, using placeholder"
+          fi
+
+      - name: 🌐 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          commit_message: '🌾 Deploy download page [skip ci]'
+
+      - name: ✅ Done
+        run: |
+          echo "Download page deployed!"
+          echo "Set app.krishiai.live CNAME to: moniruzjaman.github.io/app.krishiai"

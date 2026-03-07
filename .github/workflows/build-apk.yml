@@ -1,0 +1,76 @@
+name: 🌾 Build Krishi AI APK
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'apk-release'
+        type: choice
+        options:
+          - apk-release
+          - preview
+          - production
+
+jobs:
+  build:
+    name: EAS Build — Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── 1. Checkout code ──────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Node.js ──────────────────────────────────
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── 3. Install dependencies ───────────────────────────
+      - name: 📦 Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      # ── 4. Setup Expo / EAS CLI ───────────────────────────
+      - name: 🚀 Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # ── 5. Write Google Service Account JSON ─────────────
+      - name: 🔑 Write Google Service Account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > google-service-account.json
+
+      # ── 6. Trigger EAS Build ──────────────────────────────
+      - name: 🏗️ Build APK via EAS
+        run: |
+          PROFILE="${{ github.event.inputs.profile || 'apk-release' }}"
+          echo "Building with profile: $PROFILE"
+          eas build \
+            --platform android \
+            --profile $PROFILE \
+            --non-interactive \
+            --no-wait
+        env:
+          EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
+          EXPO_PUBLIC_OPENROUTER_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}
+
+      # ── 7. Print build dashboard link ────────────────────
+      - name: 📊 Build submitted to EAS
+        run: |
+          echo "=========================================="
+          echo "✅ Build submitted to EAS cloud!"
+          echo "Monitor at: https://expo.dev/accounts/moniruzjaman/projects/krishi-ai/builds"
+          echo "APK will be ready in ~10-15 minutes"
+          echo "=========================================="
