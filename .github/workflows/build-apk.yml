@@ -45,6 +45,27 @@ jobs:
       - name: 🔐 Verify Expo login
         run: eas whoami
 
+      - name: 🔍 Get Project ID
+        run: |
+          echo "Fetching project info..."
+          PROJECT_ID=$(curl -s \
+            -H "Authorization: Bearer $EXPO_TOKEN" \
+            "https://api.expo.dev/v2/projects?slug=krishi-ai&ownerAccount=moniruzjaman" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data'][0]['id'])" 2>/dev/null || echo "not-found")
+          echo "Project ID: $PROJECT_ID"
+          if [ "$PROJECT_ID" != "not-found" ] && [ -n "$PROJECT_ID" ]; then
+            # Update app.json with correct projectId
+            python3 -c "
+import json
+with open('app.json') as f:
+    data = json.load(f)
+data['expo']['extra'] = {'eas': {'projectId': '$PROJECT_ID'}}
+with open('app.json', 'w') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+print('Updated app.json with projectId: $PROJECT_ID')
+"
+          fi
+
       - name: 🔑 Write Google Service Account key
         run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > google-service-account.json
 
@@ -57,8 +78,7 @@ jobs:
             --platform android \
             --profile "$PROFILE" \
             --non-interactive \
-            --no-wait \
-            --freeze-credentials
+            --no-wait
 
       - name: ✅ Done
         run: |
