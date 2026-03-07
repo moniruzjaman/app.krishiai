@@ -16,6 +16,13 @@
         "gradleCommand": ":app:assembleRelease"
       }
     },
+    "apk-release": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "android": {

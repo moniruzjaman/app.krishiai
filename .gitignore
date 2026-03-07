@@ -11,3 +11,4 @@ web-build/
 *.orig.*
 ios/
 android/
+google-service-account.json
