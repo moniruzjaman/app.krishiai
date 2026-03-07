@@ -6,7 +6,6 @@ on:
       - main
     paths-ignore:
       - '**.md'
-      - '.github/**'
   workflow_dispatch:
     inputs:
       profile:
@@ -39,7 +38,7 @@ jobs:
 
       # ── 3. Install dependencies ───────────────────────────
       - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
       # ── 4. Setup Expo / EAS CLI ───────────────────────────
       - name: 🚀 Setup EAS CLI
