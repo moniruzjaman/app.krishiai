@@ -43,9 +43,7 @@ jobs:
         run: npm install -g eas-cli
 
       - name: 🔐 Verify Expo login
-        run: |
-          echo "Token length: ${#EXPO_TOKEN}"
-          eas whoami
+        run: eas whoami
 
       - name: 🔑 Write Google Service Account key
         run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > google-service-account.json
@@ -62,4 +60,8 @@ jobs:
             --no-wait
 
       - name: ✅ Done
-        run: echo "Build submitted! https://expo.dev/accounts/moniruzjaman/projects/krishi-ai/builds"
+        run: |
+          echo "======================================"
+          echo "✅ Build submitted to EAS cloud!"
+          echo "Monitor: https://expo.dev/accounts/moniruzjaman/projects/krishi-ai/builds"
+          echo "======================================"
