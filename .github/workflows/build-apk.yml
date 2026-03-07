@@ -18,6 +18,9 @@ on:
           - preview
           - production
 
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
 jobs:
   build:
     name: EAS Build — Android APK
@@ -40,9 +43,9 @@ jobs:
         run: npm install -g eas-cli
 
       - name: 🔐 Verify Expo login
-        run: eas whoami
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          echo "Token length: ${#EXPO_TOKEN}"
+          eas whoami
 
       - name: 🔑 Write Google Service Account key
         run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > google-service-account.json
@@ -57,13 +60,6 @@ jobs:
             --profile "$PROFILE" \
             --non-interactive \
             --no-wait
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
 
       - name: ✅ Done
-        run: |
-          echo "======================================"
-          echo "Build submitted to EAS cloud!"
-          echo "Monitor: https://expo.dev/accounts/moniruzjaman/projects/krishi-ai/builds"
-          echo "======================================"
+        run: echo "Build submitted! https://expo.dev/accounts/moniruzjaman/projects/krishi-ai/builds"
