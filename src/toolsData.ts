@@ -1,163 +1,46 @@
-export type ToolCategory = 'diagnosis' | 'calculator' | 'planning' | 'knowledge' | 'monitoring';
-
-export type Tool = {
+export interface Tool {
   id: string;
   name: string;
   description: string;
   icon: string;
   color: string;
-  category: ToolCategory;
+  category: string;
   route: string;
-};
+}
 
 export const TOOLS: Tool[] = [
-  // Diagnosis
-  {
-    id: 'analyzer',
-    name: 'রোগ বিশ্লেষণ',
-    description: 'ছবি দিয়ে ফসলের রোগ ও পোকা শনাক্ত করুন',
-    icon: '🔬',
-    color: '#dc2626',
-    category: 'diagnosis',
-    route: '/(tabs)/analyzer',
-  },
-  {
-    id: 'disease-library',
-    name: 'রোগ লাইব্রেরি',
-    description: 'সব ফসলের রোগের তথ্য ও সমাধান',
-    icon: '📚',
-    color: '#7c3aed',
-    category: 'diagnosis',
-    route: '/(tools)/disease-library',
-  },
-  {
-    id: 'pest-expert',
-    name: 'কীটনাশক বিশেষজ্ঞ',
-    description: 'সঠিক কীটনাশক নির্বাচন ও প্রয়োগ',
-    icon: '🐛',
-    color: '#b45309',
-    category: 'diagnosis',
-    route: '/(tools)/pesticide',
-  },
-  // Calculators
-  {
-    id: 'nutrient',
-    name: 'সার হিসাব',
-    description: 'ফসল ও জমির ধরন অনুযায়ী সার পরিমাণ',
-    icon: '⚗️',
-    color: '#0891b2',
-    category: 'calculator',
-    route: '/(tools)/nutrient',
-  },
-  {
-    id: 'yield',
-    name: 'ফলন হিসাব',
-    description: 'প্রত্যাশিত ফলন ও আয় গণনা',
-    icon: '📊',
-    color: '#059669',
-    category: 'calculator',
-    route: '/(tools)/yield',
-  },
-  {
-    id: 'ai-yield',
-    name: 'AI ফলন পূর্বাভাস',
-    description: 'কৃত্রিম বুদ্ধিমত্তা দিয়ে ফলন পূর্বানুমান',
-    icon: '🤖',
-    color: '#2563eb',
-    category: 'calculator',
-    route: '/(tools)/ai-yield',
-  },
-  // Planning
-  {
-    id: 'calendar',
-    name: 'ফসল ক্যালেন্ডার',
-    description: 'মৌসুম অনুযায়ী ফসলের সময়সূচি',
-    icon: '📅',
-    color: '#0A8A1F',
-    category: 'planning',
-    route: '/(tools)/calendar',
-  },
-  {
-    id: 'task-scheduler',
-    name: 'কাজের তালিকা',
-    description: 'কৃষি কাজের পরিকল্পনা ও রিমাইন্ডার',
-    icon: '✅',
-    color: '#6d28d9',
-    category: 'planning',
-    route: '/(tools)/tasks',
-  },
-  {
-    id: 'field-map',
-    name: 'মাঠ মানচিত্র',
-    description: 'আপনার জমির মানচিত্র তৈরি করুন',
-    icon: '🗺️',
-    color: '#065f46',
-    category: 'monitoring',
-    route: '/(tools)/field-map',
-  },
-  // Knowledge
-  {
-    id: 'soil-guide',
-    name: 'মাটি গাইড',
-    description: 'মাটির ধরন, পিএইচ ও উর্বরতা ব্যবস্থাপনা',
-    icon: '🌍',
-    color: '#92400e',
-    category: 'knowledge',
-    route: '/(tools)/soil-guide',
-  },
-  {
-    id: 'biocontrol',
-    name: 'জৈব নিয়ন্ত্রণ',
-    description: 'পরিবেশবান্ধব পোকামাকড় দমন পদ্ধতি',
-    icon: '🌿',
-    color: '#166534',
-    category: 'knowledge',
-    route: '/(tools)/biocontrol',
-  },
-  {
-    id: 'leaf-color',
-    name: 'পাতার রঙ চার্ট',
-    description: 'পাতার রঙ দেখে পুষ্টির ঘাটতি নির্ণয়',
-    icon: '🍃',
-    color: '#15803d',
-    category: 'diagnosis',
-    route: '/(tools)/leaf-color',
-  },
-  {
-    id: 'learning',
-    name: 'শিক্ষা কেন্দ্র',
-    description: 'কৃষি প্রশিক্ষণ, ভিডিও ও কোর্স',
-    icon: '🎓',
-    color: '#1d4ed8',
-    category: 'knowledge',
-    route: '/(tools)/learning',
-  },
-  {
-    id: 'flashcards',
-    name: 'ফ্ল্যাশকার্ড',
-    description: 'কৃষি জ্ঞান পরীক্ষার কার্ড',
-    icon: '🃏',
-    color: '#7c3aed',
-    category: 'knowledge',
-    route: '/(tools)/flashcards',
-  },
-  // Monitoring
-  {
-    id: 'weather',
-    name: 'আবহাওয়া',
-    description: 'বর্তমান আবহাওয়া ও কৃষি পরামর্শ',
-    icon: '🌤️',
-    color: '#0369a1',
-    category: 'monitoring',
-    route: '/(tools)/weather',
-  },
-  {
-    id: 'field-monitoring',
-    name: 'মাঠ পর্যবেক্ষণ',
-    description: 'ফসলের অবস্থা ট্র্যাক করুন',
-    icon: '👁️',
-    color: '#0f766e',
-    category: 'monitoring',
-    route: '/(tools)/field-monitoring',
-  },
+  // Diagnosis & Analysis
+  { id: 'analyzer', name: 'রোগ বিশ্লেষক', description: 'AI দিয়ে ছবি থেকে রোগ শনাক্ত করুন', icon: '🔬', color: '#0A8A1F', category: 'diagnosis', route: '/(tabs)/analyzer' },
+  { id: 'disease-library', name: 'রোগ লাইব্রেরি', description: 'ফসলের রোগ ও পোকার তথ্যভাণ্ডার', icon: '📚', color: '#7c3aed', category: 'diagnosis', route: '/(tools)/disease-library' },
+  { id: 'leaf-color', name: 'পাতার রঙ চার্ট', description: 'LCC দিয়ে নাইট্রোজেন ব্যবস্থাপনা', icon: '🍃', color: '#15803d', category: 'diagnosis', route: '/(tools)/leaf-color' },
+  { id: 'field-monitoring', name: 'মাঠ পর্যবেক্ষণ', description: 'AI দিয়ে মাঠের স্বাস্থ্য পরীক্ষা করুন', icon: '🛰️', color: '#1d4ed8', category: 'diagnosis', route: '/(tools)/field-monitoring' },
+  // Soil & Nutrients
+  { id: 'soil-expert', name: 'মৃত্তিকা বিশেষজ্ঞ', description: 'মাটি পরীক্ষা ও সুপারিশ', icon: '🌍', color: '#92400e', category: 'soil', route: '/(tools)/soil-expert' },
+  { id: 'soil-guide', name: 'মাটি পরীক্ষা গাইড', description: 'নমুনা সংগ্রহ ও ল্যাব তথ্য', icon: '🏺', color: '#78350f', category: 'soil', route: '/(tools)/soil-guide' },
+  { id: 'nutrient', name: 'সার ক্যালকুলেটর', description: 'ফসল অনুযায়ী সারের হিসাব', icon: '⚗️', color: '#059669', category: 'soil', route: '/(tools)/nutrient' },
+  // Pest & Protection
+  { id: 'pesticide', name: 'কীটনাশক বিশেষজ্ঞ', description: 'DAE অনুমোদিত কীটনাশক পরামর্শ', icon: '🐛', color: '#b45309', category: 'pest', route: '/(tools)/pesticide' },
+  { id: 'biocontrol', name: 'জৈব বালাই দমন', description: 'প্রাকৃতিক পোকা ও রোগ দমন', icon: '🐞', color: '#166534', category: 'pest', route: '/(tools)/biocontrol' },
+  { id: 'plant-defense', name: 'উদ্ভিদ প্রতিরোধ', description: 'Brix ও প্রতিরোধ ক্ষমতার পিরামিড', icon: '🛡️', color: '#15803d', category: 'pest', route: '/(tools)/plant-defense' },
+  // Planning & Yield
+  { id: 'yield', name: 'ফলন হিসাব', description: 'স্যাম্পল কাটিং ও ফলন গণনা', icon: '📊', color: '#059669', category: 'planning', route: '/(tools)/yield' },
+  { id: 'ai-yield', name: 'AI ফলন পূর্বাভাস', description: 'AI দিয়ে সম্ভাব্য ফলন জানুন', icon: '🤖', color: '#0369a1', category: 'planning', route: '/(tools)/ai-yield' },
+  { id: 'calendar', name: 'চাষ পঞ্জিকা', description: 'মৌসুমী ফসল চাষের সময়সূচি', icon: '📅', color: '#d97706', category: 'planning', route: '/(tools)/calendar' },
+  { id: 'tasks', name: 'কাজের তালিকা', description: 'মাঠের কাজ ট্র্যাক করুন', icon: '📋', color: '#1e40af', category: 'planning', route: '/(tools)/tasks' },
+  // Weather
+  { id: 'weather', name: 'আবহাওয়া', description: 'রিয়েল-টাইম আবহাওয়া ও পরামর্শ', icon: '🌤️', color: '#0284c7', category: 'weather', route: '/(tools)/weather' },
+  // Learning
+  { id: 'flashcards', name: 'ফ্ল্যাশকার্ড', description: 'AI দিয়ে কৃষি বিষয় শিখুন', icon: '🃏', color: '#7c3aed', category: 'learning', route: '/(tools)/flashcards' },
+  { id: 'podcast', name: 'কৃষি পডকাস্ট', description: 'AI কৃষি পডকাস্ট শুনুন', icon: '🎙️', color: '#7e22ce', category: 'learning', route: '/(tools)/podcast' },
+  { id: 'chat', name: 'AI চ্যাট', description: 'যেকোনো কৃষি প্রশ্নের উত্তর', icon: '💬', color: '#0A8A1F', category: 'learning', route: '/(tabs)/chat' },
+];
+
+export const TOOL_CATEGORIES = [
+  { id: 'all', label: 'সব', icon: '🔧' },
+  { id: 'diagnosis', label: 'রোগ নির্ণয়', icon: '🔬' },
+  { id: 'soil', label: 'মাটি', icon: '🌍' },
+  { id: 'pest', label: 'বালাই দমন', icon: '🐛' },
+  { id: 'planning', label: 'পরিকল্পনা', icon: '📅' },
+  { id: 'weather', label: 'আবহাওয়া', icon: '🌤️' },
+  { id: 'learning', label: 'শিক্ষা', icon: '📚' },
 ];
