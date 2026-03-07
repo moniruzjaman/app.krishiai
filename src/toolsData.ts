@@ -32,6 +32,7 @@ export const TOOLS: Tool[] = [
   // Learning
   { id: 'flashcards', name: 'ফ্ল্যাশকার্ড', description: 'AI দিয়ে কৃষি বিষয় শিখুন', icon: '🃏', color: '#7c3aed', category: 'learning', route: '/(tools)/flashcards' },
   { id: 'podcast', name: 'কৃষি পডকাস্ট', description: 'AI কৃষি পডকাস্ট শুনুন', icon: '🎙️', color: '#7e22ce', category: 'learning', route: '/(tools)/podcast' },
+  { id: 'field-map', name: 'এগ্রি-ম্যাপ', description: 'নিকটস্থ কৃষি দোকান ও DAE অফিস খুঁজুন', icon: '📍', color: '#166534', category: 'planning', route: '/(tools)/field-map' },
   { id: 'chat', name: 'AI চ্যাট', description: 'যেকোনো কৃষি প্রশ্নের উত্তর', icon: '💬', color: '#0A8A1F', category: 'learning', route: '/(tabs)/chat' },
 ];
 

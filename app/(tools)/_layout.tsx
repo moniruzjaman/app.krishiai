@@ -19,6 +19,7 @@ export default function ToolsLayout() {
       <Stack.Screen name="flashcards" />
       <Stack.Screen name="podcast" />
       <Stack.Screen name="field-monitoring" />
+      <Stack.Screen name="field-map" />
     </Stack>
   );
 }
