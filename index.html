@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krishi AI — কৃষি এআই | Download App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla&family=DM+Serif+Display:ital@0;1&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-deep:   #0a3d1f;
+    --green-mid:    #0f6b2f;
+    --green-bright: #1db954;
+    --green-light:  #a8f0c0;
+    --gold:         #f0c040;
+    --cream:        #faf6ee;
+    --brown:        #3d2b1f;
+    --white:        #ffffff;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Serif Display', serif;
+    background: var(--green-deep);
+    color: var(--cream);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Organic background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(29,185,84,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 80% at 80% 90%, rgba(15,107,47,0.25) 0%, transparent 60%),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231db954' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 20px; }
+
+  /* ── HEADER ── */
+  header {
+    text-align: center;
+    padding: 56px 0 32px;
+  }
+
+  .logo-ring {
+    width: 100px; height: 100px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--green-bright), var(--green-mid));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px;
+    box-shadow: 0 0 0 6px rgba(29,185,84,0.2), 0 0 40px rgba(29,185,84,0.3);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 6px rgba(29,185,84,0.2), 0 0 40px rgba(29,185,84,0.3); }
+    50%       { box-shadow: 0 0 0 12px rgba(29,185,84,0.1), 0 0 60px rgba(29,185,84,0.4); }
+  }
+
+  .app-name-en {
+    font-size: 42px;
+    font-style: italic;
+    color: var(--white);
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .app-name-bn {
+    font-family: 'Tiro Bangla', serif;
+    font-size: 22px;
+    color: var(--green-light);
+    margin-top: 6px;
+    letter-spacing: 2px;
+  }
+  .tagline {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: rgba(168,240,192,0.6);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 14px;
+  }
+
+  /* ── VERSION BADGE ── */
+  .version-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 28px 0;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+  .badge-green { background: rgba(29,185,84,0.2); color: var(--green-light); border: 1px solid rgba(29,185,84,0.3); }
+  .badge-gold  { background: rgba(240,192,64,0.15); color: var(--gold); border: 1px solid rgba(240,192,64,0.3); }
+  .badge-grey  { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1); }
+
+  /* ── DOWNLOAD BUTTON ── */
+  .dl-section { margin: 8px 0 32px; text-align: center; }
+
+  .dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, var(--green-bright) 0%, #16a34a 100%);
+    color: var(--white);
+    text-decoration: none;
+    padding: 18px 36px;
+    border-radius: 16px;
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    box-shadow: 0 8px 32px rgba(29,185,84,0.4), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    width: 100%;
+    justify-content: center;
+  }
+  .dl-btn:hover, .dl-btn:active {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(29,185,84,0.5), 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .dl-icon { font-size: 28px; }
+  .dl-text { display: flex; flex-direction: column; text-align: left; }
+  .dl-text span:first-child { font-size: 18px; line-height: 1.2; }
+  .dl-text span:last-child { font-family: 'Space Mono', monospace; font-size: 10px; opacity: 0.8; letter-spacing: 1px; }
+
+  .dl-note {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(168,240,192,0.5);
+    margin-top: 10px;
+    letter-spacing: 1px;
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(29,185,84,0.3), transparent);
+    margin: 24px 0;
+  }
+
+  /* ── FEATURES ── */
+  .section-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--green-bright);
+    margin-bottom: 18px;
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .feat {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(29,185,84,0.15);
+    border-radius: 12px;
+    padding: 14px 12px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .feat:hover { background: rgba(29,185,84,0.08); border-color: rgba(29,185,84,0.35); }
+  .feat-icon { font-size: 24px; margin-bottom: 6px; }
+  .feat-title {
+    font-size: 13px;
+    color: var(--white);
+    line-height: 1.3;
+  }
+  .feat-title-bn {
+    font-family: 'Tiro Bangla', serif;
+    font-size: 12px;
+    color: rgba(168,240,192,0.6);
+    margin-top: 2px;
+  }
+
+  /* ── INSTALL STEPS ── */
+  .steps { margin-bottom: 32px; }
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--green-mid), var(--green-bright));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+  }
+  .step-body {}
+  .step-title { font-size: 15px; color: var(--white); line-height: 1.3; }
+  .step-desc {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(168,240,192,0.55);
+    margin-top: 3px;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+  }
+
+  /* ── INFO BOX ── */
+  .info-box {
+    background: rgba(240,192,64,0.08);
+    border: 1px solid rgba(240,192,64,0.25);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .info-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+  .info-text { font-family: 'Space Mono', monospace; font-size: 10px; color: rgba(240,192,64,0.8); line-height: 1.7; letter-spacing: 0.5px; }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 24px 0 48px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .footer-logo { font-size: 13px; color: var(--green-bright); margin-bottom: 6px; }
+  .footer-links { font-family: 'Space Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.3); letter-spacing: 1px; }
+  .footer-links a { color: rgba(168,240,192,0.4); text-decoration: none; margin: 0 8px; }
+  .footer-links a:hover { color: var(--green-bright); }
+
+  /* ── COMING SOON BADGE ── */
+  .coming-soon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 32px;
+  }
+  .coming-soon-text { font-family: 'Space Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 1px; }
+
+  /* animate in */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  header   { animation: fadeUp 0.6s ease both; }
+  .dl-section { animation: fadeUp 0.6s 0.15s ease both; }
+  .features   { animation: fadeUp 0.6s 0.25s ease both; }
+  .steps      { animation: fadeUp 0.6s 0.35s ease both; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-ring">🌾</div>
+    <div class="app-name-en">Krishi AI</div>
+    <div class="app-name-bn">কৃষি এআই</div>
+    <div class="tagline">Bangladesh Agriculture Intelligence</div>
+  </header>
+
+  <div class="version-row">
+    <span class="badge badge-green">v2.1.0</span>
+    <span class="badge badge-gold">Android APK</span>
+    <span class="badge badge-grey">~25 MB</span>
+    <span class="badge badge-grey">Android 6.0+</span>
+  </div>
+
+  <!-- DOWNLOAD BUTTON -->
+  <div class="dl-section">
+    <a href="./krishi-ai-v2.1.0.apk" class="dl-btn" id="dlBtn">
+      <span class="dl-icon">⬇️</span>
+      <span class="dl-text">
+        <span>Download Free APK</span>
+        <span>DIRECT INSTALL · NO PLAY STORE NEEDED</span>
+      </span>
+    </a>
+    <div class="dl-note">✓ Free  ·  ✓ No login required  ·  ✓ Works offline</div>
+  </div>
+
+  <div class="coming-soon">
+    <span style="font-size:18px">🛒</span>
+    <span class="coming-soon-text">GOOGLE PLAY STORE — COMING SOON</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- FEATURES -->
+  <div class="section-title">Features — বৈশিষ্ট্যসমূহ</div>
+  <div class="features">
+    <div class="feat">
+      <div class="feat-icon">🔬</div>
+      <div class="feat-title">AI Disease Diagnosis</div>
+      <div class="feat-title-bn">ফসলের রোগ নির্ণয়</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">💬</div>
+      <div class="feat-title">AI Chat Assistant</div>
+      <div class="feat-title-bn">AI কৃষি সহায়তা</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📅</div>
+      <div class="feat-title">Crop Calendar</div>
+      <div class="feat-title-bn">ফসল ক্যালেন্ডার</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">💰</div>
+      <div class="feat-title">Market Prices</div>
+      <div class="feat-title-bn">বাজার মূল্য</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🌦️</div>
+      <div class="feat-title">Weather Forecast</div>
+      <div class="feat-title-bn">আবহাওয়া পূর্বাভাস</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🐛</div>
+      <div class="feat-title">Pest & Disease Guide</div>
+      <div class="feat-title-bn">পোকামাকড় গাইড</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🌱</div>
+      <div class="feat-title">Soil Health Tools</div>
+      <div class="feat-title-bn">মাটি বিশ্লেষণ</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📊</div>
+      <div class="feat-title">Yield Estimator</div>
+      <div class="feat-title-bn">ফলন অনুমান</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- INSTALL STEPS -->
+  <div class="section-title">How to Install — কীভাবে ইনস্টল করবেন</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Download the APK file</div>
+        <div class="step-desc">TAP THE GREEN BUTTON ABOVE TO DOWNLOAD</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Allow unknown sources</div>
+        <div class="step-desc">SETTINGS → SECURITY → INSTALL UNKNOWN APPS → ALLOW YOUR BROWSER</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Open the downloaded file</div>
+        <div class="step-desc">TAP THE .APK FILE IN YOUR DOWNLOADS FOLDER</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Tap Install → Open</div>
+        <div class="step-desc">INSTALLATION TAKES ~10 SECONDS. THEN OPEN KRISHI AI!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFO BOX -->
+  <div class="info-box">
+    <div class="info-icon">💡</div>
+    <div class="info-text">
+      This APK is the same app that will be on Google Play Store soon. It is safe, tested, and built for Bangladesh farmers. For support: <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="9ae9efeaeaf5e8eedaf1e8f3e9f2f3fbf3b4f6f3ecff">[email&#160;protected]</a>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-logo">🌾 krishiai.live</div>
+    <div class="footer-links">
+      <a href="https://krishiai.live">Home</a>
+      <a href="https://krishiai.live/privacy">Privacy Policy</a>
+      <a href="/cdn-cgi/l/email-protection#7e0d0b0e0e110c0a3e150c170d16171f17501217081b">Support</a>
+    </div>
+    <div style="font-family:'Space Mono',monospac
