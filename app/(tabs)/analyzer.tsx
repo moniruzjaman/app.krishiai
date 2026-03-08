@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Image, ActivityIndicator, Alert,
+  Image, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { analyzeWithHybridModels, type HybridAnalysisResult } from '../../src/services/hybridModelService';
-
-const CROPS = ['ধান', 'গম', 'আলু', 'টমেটো', 'বেগুন', 'পেঁয়াজ', 'সরিষা', 'ভুট্টা', 'সবজি', 'ফল'];
+import { ALL_CROPS } from '../../src/constants';
 
 const TIER_COLORS: Record<string, string> = {
   premium: '#7c3aed',
@@ -20,6 +19,9 @@ const TIER_LABELS: Record<string, string> = {
   'rule-based': '📖 Rule-Based',
 };
 
+// Popular crops shown by default
+const POPULAR_CROPS = ['ধান', 'গম', 'আলু', 'টমেটো', 'বেগুন', 'পেঁয়াজ', 'সরিষা', 'ভুট্রা', 'আম', 'পাট'];
+
 export default function AnalyzerScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -28,6 +30,12 @@ export default function AnalyzerScreen() {
   const [lang, setLang] = useState<'bn' | 'en'>('bn');
   const [selectedCrop, setSelectedCrop] = useState('');
   const [showLog, setShowLog] = useState(false);
+  const [cropSearch, setCropSearch] = useState('');
+  const [showAllCrops, setShowAllCrops] = useState(false);
+
+  const filteredCrops = cropSearch.trim()
+    ? ALL_CROPS.filter(c => c.toLowerCase().includes(cropSearch.toLowerCase()))
+    : showAllCrops ? ALL_CROPS : POPULAR_CROPS;
 
   const pickImage = async (fromCamera: boolean) => {
     const perm = fromCamera
@@ -60,7 +68,23 @@ export default function AnalyzerScreen() {
       });
       setResult(res);
     } catch (err: any) {
-      Alert.alert('ত্রুটি', err.message || 'বিশ্লেষণ ব্যর্থ হয়েছে।');
+      const msg = err.message || '';
+      // User-friendly error messages
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('Network')) {
+        Alert.alert(
+          '📡 ইন্টারনেট সংযোগ নেই',
+          'AI বিশ্লেষণের জন্য ইন্টারনেট প্রয়োজন।\n\nকরণীয়:\n• WiFi বা মোবাইল ডেটা চালু করুন\n• পুনরায় চেষ্টা করুন\n\n💡 অফলাইনে Rule-Based বিশ্লেষণ পাওয়া যাবে।',
+          [{ text: 'ঠিক আছে' }]
+        );
+      } else if (msg.includes('API') || msg.includes('key') || msg.includes('401') || msg.includes('403')) {
+        Alert.alert(
+          '🔑 AI সেবা অনুপলব্ধ',
+          'API কী সমস্যা। Rule-Based বিশ্লেষণ ব্যবহার করা হচ্ছে।',
+          [{ text: 'ঠিক আছে' }]
+        );
+      } else {
+        Alert.alert('ত্রুটি', msg || 'বিশ্লেষণ ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
+      }
     } finally {
       setLoading(false);
     }
@@ -83,15 +107,33 @@ export default function AnalyzerScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
-        <Text style={styles.label}>ফসল নির্বাচন করুন</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-          {CROPS.map(c => (
+
+        {/* Crop Selector */}
+        <Text style={styles.label}>ফসল নির্বাচন করুন ({ALL_CROPS.length}টি ফসল)</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="ফসল খুঁজুন... (যেমন: ধান, আম)"
+          value={cropSearch}
+          onChangeText={setCropSearch}
+          placeholderTextColor="#9ca3af"
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+          {filteredCrops.map(c => (
             <TouchableOpacity key={c} style={[styles.cropChip, selectedCrop === c && styles.cropChipActive]} onPress={() => setSelectedCrop(c)}>
               <Text style={[styles.cropText, selectedCrop === c && styles.cropTextActive]}>{c}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
+        {!cropSearch && (
+          <TouchableOpacity onPress={() => setShowAllCrops(v => !v)} style={styles.showAllBtn}>
+            <Text style={styles.showAllText}>{showAllCrops ? '▲ কম দেখান' : `▼ সব ফসল দেখান (${ALL_CROPS.length}টি)`}</Text>
+          </TouchableOpacity>
+        )}
+        {selectedCrop ? (
+          <Text style={styles.selectedCropText}>✅ নির্বাচিত: {selectedCrop}</Text>
+        ) : null}
 
+        {/* Image Picker */}
         {image ? (
           <View style={styles.imageBox}>
             <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
@@ -122,7 +164,7 @@ export default function AnalyzerScreen() {
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#0A8A1F" />
             <Text style={styles.loadingTitle}>হাইব্রিড AI বিশ্লেষণ চলছে...</Text>
-            <Text style={styles.loadingSteps}>Gemini 2.0 → Gemini 1.5 Free → Llama 3.1 → Rule-Based</Text>
+            <Text style={styles.loadingSteps}>Gemini 2.0 → Gemini 1.5 → Llama 3.1 → Rule-Based</Text>
           </View>
         )}
 
@@ -184,10 +226,10 @@ export default function AnalyzerScreen() {
           <View style={styles.tipCard}>
             <Text style={styles.tipTitle}>🤖 হাইব্রিড AI ক্যাসকেড</Text>
             {[
-              ['⭐', 'Gemini 2.0 Flash — সেরা মান (premium)'],
-              ['🆓', 'Gemini 1.5 Flash — বিনামূল্যে (OpenRouter)'],
-              ['🆓', 'Llama 3.1 8B — বিনামূল্যে ফলব্যাক'],
-              ['📖', 'Rule-Based — অফলাইন বিশেষজ্ঞ সিস্টেম'],
+              ['⭐', 'Gemini 2.0 Flash — সেরা মান'],
+              ['🆓', 'Gemini 1.5 Flash — বিনামূল্যে'],
+              ['🆓', 'Llama 3.1 8B — ফলব্যাক'],
+              ['📖', 'Rule-Based — অফলাইনেও কাজ করে'],
             ].map(([icon, tip], i) => (
               <Text key={i} style={styles.tipItem}>{icon} {tip}</Text>
             ))}
@@ -208,10 +250,14 @@ const styles = StyleSheet.create({
   langText: { fontSize: 12, color: '#d1fae5', fontWeight: '600' },
   langTextActive: { color: '#0A8A1F' },
   label: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 },
+  searchInput: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#1f2937', borderWidth: 1.5, borderColor: '#d1d5db', marginBottom: 10 },
   cropChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#d1d5db' },
   cropChipActive: { backgroundColor: '#0A8A1F', borderColor: '#0A8A1F' },
   cropText: { fontSize: 13, color: '#374151', fontWeight: '500' },
   cropTextActive: { color: '#fff' },
+  showAllBtn: { paddingVertical: 6, alignItems: 'center' },
+  showAllText: { fontSize: 12, color: '#0A8A1F', fontWeight: '600' },
+  selectedCropText: { fontSize: 12, color: '#059669', fontWeight: '600', marginBottom: 10 },
   imageBox: { borderRadius: 14, overflow: 'hidden', marginBottom: 12 },
   previewImage: { width: '100%', height: 240 },
   clearBtn: { backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 8, alignItems: 'center' },
