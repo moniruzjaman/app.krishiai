@@ -3,7 +3,7 @@
     "name": "Krishi AI",
     "slug": "krishi-ai",
     "owner": "moniruzjaman",
-    "version": "2.2.2",
+    "version": "2.2.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "krishiai",
@@ -30,7 +30,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A8A1F"
       },
-      "versionCode": 6,
+      "versionCode": 7,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -48,12 +48,6 @@
       "expo-router",
       "expo-secure-store",
       [
-        "expo-camera",
-        {
-          "cameraPermission": "ফসলের রোগ শনাক্ত করতে ক্যামেরা ব্যবহার করা হয়।"
-        }
-      ],
-      [
         "expo-location",
         {
           "locationWhenInUsePermission": "আপনার এলাকার আবহাওয়া ও কৃষি তথ্য দেখাতে লোকেশন ব্যবহার করা হয়।"
@@ -67,7 +61,9 @@
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "minSdkVersion": 24,
-            "buildToolsVersion": "35.0.0"
+            "buildToolsVersion": "35.0.0",
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
       ]
