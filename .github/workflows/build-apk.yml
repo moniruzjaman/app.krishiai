@@ -15,7 +15,6 @@ on:
         type: choice
         options:
           - apk-release
-          - preview
           - production
 
 env:
@@ -37,13 +36,34 @@ jobs:
           node-version: '20'
 
       - name: 📦 Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --include=dev
 
       - name: 🚀 Install EAS CLI
         run: npm install -g eas-cli
 
       - name: 🔐 Verify Expo login
         run: eas whoami
+
+      - name: 🔑 Set API keys as EAS secrets
+        run: |
+          # Push API keys to EAS secret store (stored on Expo servers, injected at build time)
+          if [ -n "${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" ]; then
+            echo "${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" | \
+              eas secret:push --scope project --name EXPO_PUBLIC_GEMINI_API_KEY --type string --non-interactive --force 2>/dev/null || \
+            eas secret:create --scope project --name EXPO_PUBLIC_GEMINI_API_KEY \
+              --value "${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" --type string --non-interactive 2>/dev/null || true
+            echo "✅ Gemini API key set"
+          else
+            echo "⚠️  EXPO_PUBLIC_GEMINI_API_KEY not set in GitHub secrets"
+          fi
+
+          if [ -n "${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}" ]; then
+            eas secret:create --scope project --name EXPO_PUBLIC_OPENROUTER_API_KEY \
+              --value "${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}" --type string --non-interactive 2>/dev/null || true
+            echo "✅ OpenRouter API key set"
+          else
+            echo "ℹ️  EXPO_PUBLIC_OPENROUTER_API_KEY not set (optional)"
+          fi
 
       - name: 🔑 Write Google Service Account key
         run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > google-service-account.json
