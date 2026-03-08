@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Image, ActivityIndicator, Alert, TextInput,
+  Image, ActivityIndicator, Alert, TextInput, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,7 +19,6 @@ const TIER_LABELS: Record<string, string> = {
   'rule-based': '📖 Rule-Based',
 };
 
-// Popular crops shown by default
 const POPULAR_CROPS = ['ধান', 'গম', 'আলু', 'টমেটো', 'বেগুন', 'পেঁয়াজ', 'সরিষা', 'ভুট্রা', 'আম', 'পাট'];
 
 export default function AnalyzerScreen() {
@@ -33,8 +32,8 @@ export default function AnalyzerScreen() {
   const [cropSearch, setCropSearch] = useState('');
   const [showAllCrops, setShowAllCrops] = useState(false);
 
-  const filteredCrops = cropSearch.trim()
-    ? ALL_CROPS.filter(c => c.toLowerCase().includes(cropSearch.toLowerCase()))
+  const displayCrops = cropSearch.trim()
+    ? ALL_CROPS.filter(c => c.toLowerCase().includes(cropSearch.toLowerCase())).slice(0, 30)
     : showAllCrops ? ALL_CROPS : POPULAR_CROPS;
 
   const pickImage = async (fromCamera: boolean) => {
@@ -56,7 +55,10 @@ export default function AnalyzerScreen() {
   };
 
   const analyze = async () => {
-    if (!imageBase64) { Alert.alert('', 'প্রথমে ছবি তুলুন বা গ্যালারি থেকে ছবি বেছে নিন।'); return; }
+    if (!imageBase64) {
+      Alert.alert('', 'প্রথমে ছবি তুলুন বা গ্যালারি থেকে ছবি বেছে নিন।');
+      return;
+    }
     setLoading(true);
     try {
       const res = await analyzeWithHybridModels({
@@ -69,21 +71,14 @@ export default function AnalyzerScreen() {
       setResult(res);
     } catch (err: any) {
       const msg = err.message || '';
-      // User-friendly error messages
       if (msg.includes('network') || msg.includes('fetch') || msg.includes('Network')) {
-        Alert.alert(
-          '📡 ইন্টারনেট সংযোগ নেই',
-          'AI বিশ্লেষণের জন্য ইন্টারনেট প্রয়োজন।\n\nকরণীয়:\n• WiFi বা মোবাইল ডেটা চালু করুন\n• পুনরায় চেষ্টা করুন\n\n💡 অফলাইনে Rule-Based বিশ্লেষণ পাওয়া যাবে।',
-          [{ text: 'ঠিক আছে' }]
-        );
+        Alert.alert('📡 ইন্টারনেট সংযোগ নেই',
+          'WiFi বা মোবাইল ডেটা চালু করে পুনরায় চেষ্টা করুন।\n💡 Rule-Based বিশ্লেষণ অফলাইনেও কাজ করে।',
+          [{ text: 'ঠিক আছে' }]);
       } else if (msg.includes('API') || msg.includes('key') || msg.includes('401') || msg.includes('403')) {
-        Alert.alert(
-          '🔑 AI সেবা অনুপলব্ধ',
-          'API কী সমস্যা। Rule-Based বিশ্লেষণ ব্যবহার করা হচ্ছে।',
-          [{ text: 'ঠিক আছে' }]
-        );
+        Alert.alert('🔑 AI সেবা অনুপলব্ধ', 'API সমস্যা। Rule-Based বিশ্লেষণ চলছে।', [{ text: 'ঠিক আছে' }]);
       } else {
-        Alert.alert('ত্রুটি', msg || 'বিশ্লেষণ ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
+        Alert.alert('ত্রুটি', msg || 'বিশ্লেষণ ব্যর্থ। পুনরায় চেষ্টা করুন।');
       }
     } finally {
       setLoading(false);
@@ -93,8 +88,11 @@ export default function AnalyzerScreen() {
   const getCategoryColor = (cat: string) =>
     ({ Pest: '#dc2626', Disease: '#ea580c', Deficiency: '#d97706', Other: '#6b7280' }[cat] || '#6b7280');
 
+  const reset = () => { setResult(null); setImage(null); setImageBase64(null); };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🔬 ফসলের রোগ বিশ্লেষণ</Text>
         <View style={styles.langToggle}>
@@ -106,68 +104,96 @@ export default function AnalyzerScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
-
-        {/* Crop Selector */}
-        <Text style={styles.label}>ফসল নির্বাচন করুন ({ALL_CROPS.length}টি ফসল)</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="ফসল খুঁজুন... (যেমন: ধান, আম)"
-          value={cropSearch}
-          onChangeText={setCropSearch}
-          placeholderTextColor="#9ca3af"
-        />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-          {filteredCrops.map(c => (
-            <TouchableOpacity key={c} style={[styles.cropChip, selectedCrop === c && styles.cropChipActive]} onPress={() => setSelectedCrop(c)}>
-              <Text style={[styles.cropText, selectedCrop === c && styles.cropTextActive]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        {!cropSearch && (
-          <TouchableOpacity onPress={() => setShowAllCrops(v => !v)} style={styles.showAllBtn}>
-            <Text style={styles.showAllText}>{showAllCrops ? '▲ কম দেখান' : `▼ সব ফসল দেখান (${ALL_CROPS.length}টি)`}</Text>
-          </TouchableOpacity>
-        )}
-        {selectedCrop ? (
-          <Text style={styles.selectedCropText}>✅ নির্বাচিত: {selectedCrop}</Text>
-        ) : null}
-
-        {/* Image Picker */}
-        {image ? (
-          <View style={styles.imageBox}>
-            <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
-            <TouchableOpacity style={styles.clearBtn} onPress={() => { setImage(null); setImageBase64(null); setResult(null); }}>
-              <Text style={styles.clearBtnText}>✕ পরিবর্তন</Text>
-            </TouchableOpacity>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── STEP 1: Crop Selection ── */}
+        <View style={styles.section}>
+          <Text style={styles.stepLabel}>ধাপ ১ — ফসল নির্বাচন করুন</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder={`ফসল খুঁজুন... (${ALL_CROPS.length}টি ফসল)`}
+            value={cropSearch}
+            onChangeText={setCropSearch}
+            placeholderTextColor="#9ca3af"
+          />
+          {/* Crop chips - use FlatList instead of nested ScrollView */}
+          <View style={styles.cropGrid}>
+            {displayCrops.map(c => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.cropChip, selectedCrop === c && styles.cropChipActive]}
+                onPress={() => setSelectedCrop(selectedCrop === c ? '' : c)}
+              >
+                <Text style={[styles.cropText, selectedCrop === c && styles.cropTextActive]}>{c}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ) : (
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.cameraBtn} onPress={() => pickImage(true)}>
-              <Text style={styles.cameraIcon}>📸</Text>
-              <Text style={styles.cameraBtnText}>ক্যামেরা</Text>
+          {!cropSearch && (
+            <TouchableOpacity onPress={() => setShowAllCrops(v => !v)} style={styles.showAllBtn}>
+              <Text style={styles.showAllText}>
+                {showAllCrops ? '▲ কম দেখান' : `▼ সব দেখান (${ALL_CROPS.length}টি)`}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.cameraBtn, styles.galleryBtn]} onPress={() => pickImage(false)}>
-              <Text style={styles.cameraIcon}>🖼️</Text>
-              <Text style={[styles.cameraBtnText, { color: '#0A8A1F' }]}>গ্যালারি</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          )}
+          {selectedCrop ? (
+            <Text style={styles.selectedCropText}>✅ নির্বাচিত ফসল: {selectedCrop}</Text>
+          ) : null}
+        </View>
 
+        {/* ── STEP 2: Image Upload ── */}
+        <View style={styles.section}>
+          <Text style={styles.stepLabel}>ধাপ ২ — ছবি তুলুন বা আপলোড করুন</Text>
+          {image ? (
+            <View style={styles.imageBox}>
+              <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
+              <TouchableOpacity style={styles.clearBtn} onPress={reset}>
+                <Text style={styles.clearBtnText}>✕ পরিবর্তন করুন</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.cameraBtn} onPress={() => pickImage(true)}>
+                <Text style={styles.cameraIcon}>📸</Text>
+                <Text style={styles.cameraBtnText}>ক্যামেরা</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.cameraBtn, styles.galleryBtn]} onPress={() => pickImage(false)}>
+                <Text style={styles.cameraIcon}>🖼️</Text>
+                <Text style={[styles.cameraBtnText, { color: '#0A8A1F' }]}>গ্যালারি</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* ── STEP 3: Analyze Button ── */}
         {image && !result && (
-          <TouchableOpacity style={[styles.analyzeBtn, loading && { opacity: 0.7 }]} onPress={analyze} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.analyzeBtnText}>🔍 Hybrid AI বিশ্লেষণ</Text>}
-          </TouchableOpacity>
+          <View style={styles.section}>
+            <Text style={styles.stepLabel}>ধাপ ৩ — বিশ্লেষণ করুন</Text>
+            <TouchableOpacity
+              style={[styles.analyzeBtn, loading && styles.analyzeBtnDisabled]}
+              onPress={analyze}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.analyzeBtnText}>🔍 AI বিশ্লেষণ শুরু করুন</Text>
+              }
+            </TouchableOpacity>
+          </View>
         )}
 
+        {/* Loading */}
         {loading && (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#0A8A1F" />
-            <Text style={styles.loadingTitle}>হাইব্রিড AI বিশ্লেষণ চলছে...</Text>
-            <Text style={styles.loadingSteps}>Gemini 2.0 → Gemini 1.5 → Llama 3.1 → Rule-Based</Text>
+            <Text style={styles.loadingTitle}>AI বিশ্লেষণ চলছে...</Text>
+            <Text style={styles.loadingSteps}>Gemini 2.0 → Gemini 1.5 → Llama → Rule-Based</Text>
           </View>
         )}
 
+        {/* ── RESULT ── */}
         {result && !loading && (
           <View style={styles.resultCard}>
             <View style={[styles.modelBadge, { backgroundColor: (TIER_COLORS[result.tier] || '#666') + '18' }]}>
@@ -191,7 +217,9 @@ export default function AnalyzerScreen() {
                   backgroundColor: result.confidence >= 75 ? '#0A8A1F' : result.confidence >= 55 ? '#d97706' : '#dc2626',
                 }]} />
               </View>
-              <Text style={[styles.confValue, { color: result.confidence >= 75 ? '#0A8A1F' : '#d97706' }]}>{result.confidence}%</Text>
+              <Text style={[styles.confValue, { color: result.confidence >= 75 ? '#0A8A1F' : '#d97706' }]}>
+                {result.confidence}%
+              </Text>
             </View>
 
             <View style={styles.divider} />
@@ -216,19 +244,19 @@ export default function AnalyzerScreen() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.retryBtn} onPress={() => { setResult(null); setImage(null); setImageBase64(null); }}>
+            <TouchableOpacity style={styles.retryBtn} onPress={reset}>
               <Text style={styles.retryText}>🔄 নতুন বিশ্লেষণ</Text>
             </TouchableOpacity>
           </View>
         )}
 
+        {/* Info card when idle */}
         {!image && !result && (
           <View style={styles.tipCard}>
-            <Text style={styles.tipTitle}>🤖 হাইব্রিড AI ক্যাসকেড</Text>
+            <Text style={styles.tipTitle}>🤖 AI ক্যাসকেড সিস্টেম</Text>
             {[
-              ['⭐', 'Gemini 2.0 Flash — সেরা মান'],
-              ['🆓', 'Gemini 1.5 Flash — বিনামূল্যে'],
-              ['🆓', 'Llama 3.1 8B — ফলব্যাক'],
+              ['⭐', 'Gemini 2.0 Flash — সেরা মানের AI বিশ্লেষণ'],
+              ['🆓', 'Gemini 1.5 / Llama — বিনামূল্যে ফলব্যাক'],
               ['📖', 'Rule-Based — অফলাইনেও কাজ করে'],
             ].map(([icon, tip], i) => (
               <Text key={i} style={styles.tipItem}>{icon} {tip}</Text>
@@ -242,41 +270,71 @@ export default function AnalyzerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f7f0' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0A8A1F', paddingHorizontal: 16, paddingVertical: 14 },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#0A8A1F', paddingHorizontal: 16, paddingVertical: 14,
+  },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#fff' },
   langToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 },
   langBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   langBtnActive: { backgroundColor: '#fff' },
   langText: { fontSize: 12, color: '#d1fae5', fontWeight: '600' },
   langTextActive: { color: '#0A8A1F' },
-  label: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 8 },
-  searchInput: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#1f2937', borderWidth: 1.5, borderColor: '#d1d5db', marginBottom: 10 },
-  cropChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#d1d5db' },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  section: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 14,
+    marginBottom: 12, elevation: 2,
+  },
+  stepLabel: { fontSize: 13, fontWeight: '700', color: '#0A8A1F', marginBottom: 10 },
+  searchInput: {
+    backgroundColor: '#f9fafb', borderRadius: 10, paddingHorizontal: 14,
+    paddingVertical: 10, fontSize: 14, color: '#1f2937',
+    borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 10,
+  },
+  cropGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  cropChip: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: '#f0f7f0', borderWidth: 1.5, borderColor: '#d1fae5',
+  },
   cropChipActive: { backgroundColor: '#0A8A1F', borderColor: '#0A8A1F' },
   cropText: { fontSize: 13, color: '#374151', fontWeight: '500' },
   cropTextActive: { color: '#fff' },
-  showAllBtn: { paddingVertical: 6, alignItems: 'center' },
+  showAllBtn: { paddingVertical: 8, alignItems: 'center', marginTop: 4 },
   showAllText: { fontSize: 12, color: '#0A8A1F', fontWeight: '600' },
-  selectedCropText: { fontSize: 12, color: '#059669', fontWeight: '600', marginBottom: 10 },
-  imageBox: { borderRadius: 14, overflow: 'hidden', marginBottom: 12 },
-  previewImage: { width: '100%', height: 240 },
-  clearBtn: { backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 8, alignItems: 'center' },
-  clearBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  cameraBtn: { flex: 1, backgroundColor: '#0A8A1F', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  selectedCropText: { fontSize: 12, color: '#059669', fontWeight: '700', marginTop: 8 },
+  imageBox: { borderRadius: 12, overflow: 'hidden' },
+  previewImage: { width: '100%', height: 220 },
+  clearBtn: { backgroundColor: 'rgba(0,0,0,0.55)', paddingVertical: 10, alignItems: 'center' },
+  clearBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  actionRow: { flexDirection: 'row', gap: 10 },
+  cameraBtn: {
+    flex: 1, backgroundColor: '#0A8A1F', borderRadius: 12,
+    paddingVertical: 16, alignItems: 'center',
+    flexDirection: 'row', justifyContent: 'center', gap: 8,
+  },
   galleryBtn: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#0A8A1F' },
   cameraIcon: { fontSize: 20 },
   cameraBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  analyzeBtn: { backgroundColor: '#0A8A1F', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginVertical: 8 },
+  analyzeBtn: {
+    backgroundColor: '#0A8A1F', borderRadius: 12,
+    paddingVertical: 18, alignItems: 'center',
+  },
+  analyzeBtnDisabled: { opacity: 0.6 },
   analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   loadingBox: { alignItems: 'center', padding: 24 },
   loadingTitle: { fontSize: 15, fontWeight: '700', color: '#0A8A1F', marginTop: 12 },
   loadingSteps: { fontSize: 11, color: '#6b7280', marginTop: 4, textAlign: 'center' },
-  resultCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 8, elevation: 3 },
-  modelBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 8 },
+  resultCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 3 },
+  modelBadge: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 8,
+  },
   modelDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   modelBadgeText: { fontSize: 11, fontWeight: '700' },
-  catBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 8 },
+  catBadge: {
+    alignSelf: 'flex-start', paddingHorizontal: 10,
+    paddingVertical: 4, borderRadius: 20, marginBottom: 8,
+  },
   catText: { fontSize: 12, fontWeight: '700' },
   diagnosisTitle: { fontSize: 19, fontWeight: 'bold', color: '#1f2937', marginBottom: 10 },
   confRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -296,7 +354,7 @@ const styles = StyleSheet.create({
   logReason: { fontSize: 11, color: '#9ca3af', marginLeft: 18 },
   retryBtn: { backgroundColor: '#f0f7f0', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 12 },
   retryText: { color: '#0A8A1F', fontWeight: '700' },
-  tipCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginTop: 8 },
+  tipCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, elevation: 2 },
   tipTitle: { fontSize: 15, fontWeight: '700', color: '#1f2937', marginBottom: 10 },
   tipItem: { fontSize: 13, color: '#374151', marginBottom: 6 },
 });
