@@ -13,6 +13,8 @@
  *   EXPO_PUBLIC_OPENROUTER_API_KEY  — OpenRouter (free + paid models)
  */
 
+import { getGeminiKey, getOpenRouterKey } from './apiKeys';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ModelProvider = 'gemini' | 'openrouter';
@@ -80,14 +82,7 @@ export const MODELS: Record<string, AIModel> = {
 };
 
 // ─── API Key helpers ──────────────────────────────────────────────────────────
-
-function getGeminiKey(): string {
-  return (process.env.EXPO_PUBLIC_GEMINI_API_KEY as string) || '';
-}
-
-function getOpenRouterKey(): string {
-  return (process.env.EXPO_PUBLIC_OPENROUTER_API_KEY as string) || '';
-}
+// (resolved via ./apiKeys.ts)
 
 // ─── Prompts (three tiers, matching the original modelService.ts) ─────────────
 

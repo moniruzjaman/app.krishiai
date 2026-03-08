@@ -44,25 +44,28 @@ jobs:
       - name: 🔐 Verify Expo login
         run: eas whoami
 
-      - name: 🔑 Set API keys as EAS secrets
+      - name: 🔑 Write API keys to .env file
         run: |
-          # Push API keys to EAS secret store (stored on Expo servers, injected at build time)
-          if [ -n "${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" ]; then
-            echo "${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" | \
-              eas secret:push --scope project --name EXPO_PUBLIC_GEMINI_API_KEY --type string --non-interactive --force 2>/dev/null || \
-            eas secret:create --scope project --name EXPO_PUBLIC_GEMINI_API_KEY \
-              --value "${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" --type string --non-interactive 2>/dev/null || true
-            echo "✅ Gemini API key set"
+          # EXPO_PUBLIC_ vars are baked into the JS bundle at build time
+          # EAS reads .env automatically - this is the correct approach
+          echo "EXPO_PUBLIC_GEMINI_API_KEY=${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_OPENROUTER_API_KEY=${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}" >> .env
+          echo "NODE_ENV=production" >> .env
+          
+          # Verify keys are present (show only first 10 chars for security)
+          GEMINI_KEY="${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}"
+          OPENROUTER_KEY="${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}"
+          
+          if [ -n "$GEMINI_KEY" ]; then
+            echo "✅ Gemini key: ${GEMINI_KEY:0:10}..."
           else
-            echo "⚠️  EXPO_PUBLIC_GEMINI_API_KEY not set in GitHub secrets"
+            echo "❌ WARNING: EXPO_PUBLIC_GEMINI_API_KEY is empty!"
           fi
-
-          if [ -n "${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}" ]; then
-            eas secret:create --scope project --name EXPO_PUBLIC_OPENROUTER_API_KEY \
-              --value "${{ secrets.EXPO_PUBLIC_OPENROUTER_API_KEY }}" --type string --non-interactive 2>/dev/null || true
-            echo "✅ OpenRouter API key set"
+          
+          if [ -n "$OPENROUTER_KEY" ]; then
+            echo "✅ OpenRouter key: ${OPENROUTER_KEY:0:10}..."
           else
-            echo "ℹ️  EXPO_PUBLIC_OPENROUTER_API_KEY not set (optional)"
+            echo "⚠️  OpenRouter key not set (optional)"
           fi
 
       - name: 🔑 Write Google Service Account key

@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { analyzeWithHybridModels, type HybridAnalysisResult } from '../../src/services/hybridModelService';
+import { getApiStatus, getApiDebugInfo } from '../../src/services/apiKeys';
 import { ALL_CROPS } from '../../src/constants';
 
 const TIER_COLORS: Record<string, string> = {
@@ -31,6 +32,8 @@ export default function AnalyzerScreen() {
   const [showLog, setShowLog] = useState(false);
   const [cropSearch, setCropSearch] = useState('');
   const [showAllCrops, setShowAllCrops] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const apiStatus = getApiStatus();
 
   const displayCrops = cropSearch.trim()
     ? ALL_CROPS.filter(c => c.toLowerCase().includes(cropSearch.toLowerCase())).slice(0, 30)
@@ -109,6 +112,21 @@ export default function AnalyzerScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* API Status Banner */}
+        <TouchableOpacity
+          onPress={() => setShowDebug(v => !v)}
+          style={[styles.apiBanner, apiStatus.gemini ? styles.apiBannerOk : styles.apiBannerWarn]}
+        >
+          <Text style={styles.apiBannerText}>
+            {apiStatus.gemini ? '✅ Gemini AI সক্রিয়' : '⚠️ API কী পাওয়া যাচ্ছে না — Rule-Based মোডে চলছে'}
+          </Text>
+          <Text style={styles.apiBannerSub}>{showDebug ? '▲ লুকান' : '▼ বিস্তারিত'}</Text>
+        </TouchableOpacity>
+        {showDebug && (
+          <View style={styles.debugBox}>
+            <Text style={styles.debugText}>{getApiDebugInfo()}</Text>
+          </View>
+        )}
         {/* ── STEP 1: Crop Selection ── */}
         <View style={styles.section}>
           <Text style={styles.stepLabel}>ধাপ ১ — ফসল নির্বাচন করুন</Text>
@@ -357,4 +375,14 @@ const styles = StyleSheet.create({
   tipCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, elevation: 2 },
   tipTitle: { fontSize: 15, fontWeight: '700', color: '#1f2937', marginBottom: 10 },
   tipItem: { fontSize: 13, color: '#374151', marginBottom: 6 },
+  apiBanner: {
+    borderRadius: 10, padding: 12, marginBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  apiBannerOk: { backgroundColor: '#d1fae5' },
+  apiBannerWarn: { backgroundColor: '#fef3c7' },
+  apiBannerText: { fontSize: 13, fontWeight: '700', color: '#1f2937', flex: 1 },
+  apiBannerSub: { fontSize: 11, color: '#6b7280', marginLeft: 8 },
+  debugBox: { backgroundColor: '#1f2937', borderRadius: 8, padding: 12, marginBottom: 12 },
+  debugText: { fontSize: 11, color: '#4ade80', fontFamily: 'monospace', lineHeight: 18 },
 });
