@@ -45,3 +45,5 @@ export const TOOL_CATEGORIES = [
   { id: 'weather', label: 'আবহাওয়া', icon: '🌤️' },
   { id: 'learning', label: 'শিক্ষা', icon: '📚' },
 ];
+
+export type ToolCategory = 'diagnosis' | 'soil' | 'weather' | 'market' | 'planning' | 'learning' | 'calculator' | 'knowledge' | 'monitoring' | 'all';
