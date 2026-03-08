@@ -58,6 +58,14 @@
         {
           "locationWhenInUsePermission": "আপনার এলাকার আবহাওয়া ও কৃষি তথ্য দেখাতে লোকেশন ব্যবহার করা হয়।"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
       ]
     ],
     "experiments": {
