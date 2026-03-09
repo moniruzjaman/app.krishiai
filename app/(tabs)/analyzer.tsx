@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Image, ActivityIndicator, Alert, TextInput, FlatList,
+  Image, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -76,10 +76,8 @@ export default function AnalyzerScreen() {
       const msg = err.message || '';
       if (msg.includes('network') || msg.includes('fetch') || msg.includes('Network')) {
         Alert.alert('📡 ইন্টারনেট সংযোগ নেই',
-          'WiFi বা মোবাইল ডেটা চালু করে পুনরায় চেষ্টা করুন।\n💡 Rule-Based বিশ্লেষণ অফলাইনেও কাজ করে।',
+          'WiFi বা মোবাইল ডেটা চালু করে পুনরায় চেষ্টা করুন।',
           [{ text: 'ঠিক আছে' }]);
-      } else if (msg.includes('API') || msg.includes('key') || msg.includes('401') || msg.includes('403')) {
-        Alert.alert('🔑 AI সেবা অনুপলব্ধ', 'API সমস্যা। Rule-Based বিশ্লেষণ চলছে।', [{ text: 'ঠিক আছে' }]);
       } else {
         Alert.alert('ত্রুটি', msg || 'বিশ্লেষণ ব্যর্থ। পুনরায় চেষ্টা করুন।');
       }
@@ -88,10 +86,10 @@ export default function AnalyzerScreen() {
     }
   };
 
+  const reset = () => { setResult(null); setImage(null); setImageBase64(null); };
+
   const getCategoryColor = (cat: string) =>
     ({ Pest: '#dc2626', Disease: '#ea580c', Deficiency: '#d97706', Other: '#6b7280' }[cat] || '#6b7280');
-
-  const reset = () => { setResult(null); setImage(null); setImageBase64(null); };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -118,15 +116,16 @@ export default function AnalyzerScreen() {
           style={[styles.apiBanner, apiStatus.gemini ? styles.apiBannerOk : styles.apiBannerWarn]}
         >
           <Text style={styles.apiBannerText}>
-            {apiStatus.gemini ? '✅ Gemini AI সক্রিয়' : '⚠️ API কী পাওয়া যাচ্ছে না — Rule-Based মোডে চলছে'}
+            {apiStatus.gemini ? '✅ Gemini AI সক্রিয়' : '⚠️ API কী পাওয়া যাচ্ছে না — Rule-Based মোড'}
           </Text>
-          <Text style={styles.apiBannerSub}>{showDebug ? '▲ লুকান' : '▼ বিস্তারিত'}</Text>
+          <Text style={styles.apiBannerSub}>{showDebug ? '▲' : '▼'} বিস্তারিত</Text>
         </TouchableOpacity>
         {showDebug && (
           <View style={styles.debugBox}>
             <Text style={styles.debugText}>{getApiDebugInfo()}</Text>
           </View>
         )}
+
         {/* ── STEP 1: Crop Selection ── */}
         <View style={styles.section}>
           <Text style={styles.stepLabel}>ধাপ ১ — ফসল নির্বাচন করুন</Text>
@@ -137,7 +136,6 @@ export default function AnalyzerScreen() {
             onChangeText={setCropSearch}
             placeholderTextColor="#9ca3af"
           />
-          {/* Crop chips - use FlatList instead of nested ScrollView */}
           <View style={styles.cropGrid}>
             {displayCrops.map(c => (
               <TouchableOpacity
@@ -157,59 +155,57 @@ export default function AnalyzerScreen() {
             </TouchableOpacity>
           )}
           {selectedCrop ? (
-            <Text style={styles.selectedCropText}>✅ নির্বাচিত ফসল: {selectedCrop}</Text>
+            <Text style={styles.selectedCropText}>✅ নির্বাচিত: {selectedCrop}</Text>
           ) : null}
         </View>
 
-        {/* ── STEP 2: Image Upload ── */}
+        {/* ── STEP 2+3 combined: Image + Analyze ── */}
         <View style={styles.section}>
-          <Text style={styles.stepLabel}>ধাপ ২ — ছবি তুলুন বা আপলোড করুন</Text>
+          <Text style={styles.stepLabel}>ধাপ ২ — ছবি তুলুন ও বিশ্লেষণ করুন</Text>
+
+          {/* Image preview — always show if image selected */}
           {image ? (
-            <View style={styles.imageBox}>
-              <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
-              <TouchableOpacity style={styles.clearBtn} onPress={reset}>
-                <Text style={styles.clearBtnText}>✕ পরিবর্তন করুন</Text>
+            <View style={styles.imageWrapper}>
+              <Image
+                source={{ uri: image }}
+                style={styles.previewImage}
+                resizeMode="cover"
+              />
+              {/* Change image button overlaid on image */}
+              <TouchableOpacity style={styles.changeBtn} onPress={reset}>
+                <Text style={styles.changeBtnText}>✕ পরিবর্তন করুন</Text>
               </TouchableOpacity>
             </View>
           ) : (
+            /* Camera / Gallery buttons */
             <View style={styles.actionRow}>
               <TouchableOpacity style={styles.cameraBtn} onPress={() => pickImage(true)}>
-                <Text style={styles.cameraIcon}>📸</Text>
+                <Text style={styles.btnIcon}>📸</Text>
                 <Text style={styles.cameraBtnText}>ক্যামেরা</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.cameraBtn, styles.galleryBtn]} onPress={() => pickImage(false)}>
-                <Text style={styles.cameraIcon}>🖼️</Text>
+                <Text style={styles.btnIcon}>🖼️</Text>
                 <Text style={[styles.cameraBtnText, { color: '#0A8A1F' }]}>গ্যালারি</Text>
               </TouchableOpacity>
             </View>
           )}
-        </View>
 
-        {/* ── STEP 3: Analyze Button ── */}
-        {image && !result && (
-          <View style={styles.section}>
-            <Text style={styles.stepLabel}>ধাপ ৩ — বিশ্লেষণ করুন</Text>
-            <TouchableOpacity
-              style={[styles.analyzeBtn, loading && styles.analyzeBtnDisabled]}
-              onPress={analyze}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.analyzeBtnText}>🔍 AI বিশ্লেষণ শুরু করুন</Text>
-              }
+          {/* Analyze button — shown directly below image, always visible */}
+          {image && !loading && !result && (
+            <TouchableOpacity style={styles.analyzeBtn} onPress={analyze}>
+              <Text style={styles.analyzeBtnText}>🔍 AI বিশ্লেষণ শুরু করুন</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
 
-        {/* Loading */}
-        {loading && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#0A8A1F" />
-            <Text style={styles.loadingTitle}>AI বিশ্লেষণ চলছে...</Text>
-            <Text style={styles.loadingSteps}>Gemini 2.0 → Gemini 1.5 → Llama → Rule-Based</Text>
-          </View>
-        )}
+          {/* Loading state */}
+          {loading && (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#0A8A1F" />
+              <Text style={styles.loadingTitle}>AI বিশ্লেষণ চলছে...</Text>
+              <Text style={styles.loadingSteps}>Worker → Gemini 2.0 → Llama → Rule-Based</Text>
+            </View>
+          )}
+        </View>
 
         {/* ── RESULT ── */}
         {result && !loading && (
@@ -243,12 +239,13 @@ export default function AnalyzerScreen() {
             <View style={styles.divider} />
             <Text style={styles.advisoryTitle}>💡 পরামর্শ</Text>
             <Text style={styles.advisoryText}>{result.advisory}</Text>
-            {result.officialSource ? <Text style={styles.sourceText}>📌 {result.officialSource}</Text> : null}
+            {result.officialSource ? (
+              <Text style={styles.sourceText}>📌 {result.officialSource}</Text>
+            ) : null}
 
             <TouchableOpacity style={styles.logToggle} onPress={() => setShowLog(v => !v)}>
               <Text style={styles.logToggleText}>{showLog ? '▲' : '▼'} মডেল লগ ({result.attemptLog.length} ধাপ)</Text>
             </TouchableOpacity>
-
             {showLog && (
               <View style={styles.logBox}>
                 {result.attemptLog.map((e, i) => (
@@ -273,6 +270,7 @@ export default function AnalyzerScreen() {
           <View style={styles.tipCard}>
             <Text style={styles.tipTitle}>🤖 AI ক্যাসকেড সিস্টেম</Text>
             {[
+              ['☁️', 'Cloudflare Worker — সুরক্ষিত গেটওয়ে'],
               ['⭐', 'Gemini 2.0 Flash — সেরা মানের AI বিশ্লেষণ'],
               ['🆓', 'Gemini 1.5 / Llama — বিনামূল্যে ফলব্যাক'],
               ['📖', 'Rule-Based — অফলাইনেও কাজ করে'],
@@ -299,6 +297,16 @@ const styles = StyleSheet.create({
   langText: { fontSize: 12, color: '#d1fae5', fontWeight: '600' },
   langTextActive: { color: '#0A8A1F' },
   scrollContent: { padding: 16, paddingBottom: 40 },
+  apiBanner: {
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  apiBannerOk: { backgroundColor: '#d1fae5' },
+  apiBannerWarn: { backgroundColor: '#fef3c7' },
+  apiBannerText: { fontSize: 13, fontWeight: '700', color: '#1f2937', flex: 1 },
+  apiBannerSub: { fontSize: 11, color: '#6b7280', marginLeft: 8 },
+  debugBox: { backgroundColor: '#1f2937', borderRadius: 8, padding: 12, marginBottom: 8 },
+  debugText: { fontSize: 11, color: '#4ade80', lineHeight: 18 },
   section: {
     backgroundColor: '#fff', borderRadius: 14, padding: 14,
     marginBottom: 12, elevation: 2,
@@ -320,28 +328,40 @@ const styles = StyleSheet.create({
   showAllBtn: { paddingVertical: 8, alignItems: 'center', marginTop: 4 },
   showAllText: { fontSize: 12, color: '#0A8A1F', fontWeight: '600' },
   selectedCropText: { fontSize: 12, color: '#059669', fontWeight: '700', marginTop: 8 },
-  imageBox: { borderRadius: 12, overflow: 'hidden' },
-  previewImage: { width: '100%', height: 220 },
-  clearBtn: { backgroundColor: 'rgba(0,0,0,0.55)', paddingVertical: 10, alignItems: 'center' },
-  clearBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  actionRow: { flexDirection: 'row', gap: 10 },
+  // Image area
+  imageWrapper: {
+    borderRadius: 12, overflow: 'hidden', marginBottom: 12,
+    borderWidth: 2, borderColor: '#0A8A1F',
+  },
+  previewImage: {
+    width: '100%',
+    height: 240,
+  },
+  changeBtn: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  changeBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
   cameraBtn: {
     flex: 1, backgroundColor: '#0A8A1F', borderRadius: 12,
-    paddingVertical: 16, alignItems: 'center',
+    paddingVertical: 18, alignItems: 'center',
     flexDirection: 'row', justifyContent: 'center', gap: 8,
   },
   galleryBtn: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#0A8A1F' },
-  cameraIcon: { fontSize: 20 },
+  btnIcon: { fontSize: 20 },
   cameraBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  // Analyze button — bold green, full width, right below image
   analyzeBtn: {
     backgroundColor: '#0A8A1F', borderRadius: 12,
-    paddingVertical: 18, alignItems: 'center',
+    paddingVertical: 18, alignItems: 'center', marginTop: 2,
   },
-  analyzeBtnDisabled: { opacity: 0.6 },
-  analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  loadingBox: { alignItems: 'center', padding: 24 },
+  analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  loadingBox: { alignItems: 'center', paddingVertical: 24 },
   loadingTitle: { fontSize: 15, fontWeight: '700', color: '#0A8A1F', marginTop: 12 },
   loadingSteps: { fontSize: 11, color: '#6b7280', marginTop: 4, textAlign: 'center' },
+  // Result card
   resultCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 3 },
   modelBadge: {
     flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start',
@@ -375,14 +395,4 @@ const styles = StyleSheet.create({
   tipCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, elevation: 2 },
   tipTitle: { fontSize: 15, fontWeight: '700', color: '#1f2937', marginBottom: 10 },
   tipItem: { fontSize: 13, color: '#374151', marginBottom: 6 },
-  apiBanner: {
-    borderRadius: 10, padding: 12, marginBottom: 12,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  apiBannerOk: { backgroundColor: '#d1fae5' },
-  apiBannerWarn: { backgroundColor: '#fef3c7' },
-  apiBannerText: { fontSize: 13, fontWeight: '700', color: '#1f2937', flex: 1 },
-  apiBannerSub: { fontSize: 11, color: '#6b7280', marginLeft: 8 },
-  debugBox: { backgroundColor: '#1f2937', borderRadius: 8, padding: 12, marginBottom: 12 },
-  debugText: { fontSize: 11, color: '#4ade80', fontFamily: 'monospace', lineHeight: 18 },
 });
