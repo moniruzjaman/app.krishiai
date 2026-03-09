@@ -1,0 +1,24 @@
+name: 🧪 Test Worker API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🌾 Test health check
+        run: |
+          echo "=== Health Check ===" 
+          curl -s https://app-krishiai.mithun-hstu.workers.dev | python3 -m json.tool
+
+      - name: 🔬 Test AI text query
+        run: |
+          echo "=== AI Text Query ==="
+          curl -s -X POST https://app-krishiai.mithun-hstu.workers.dev \
+            -H "Content-Type: application/json" \
+            -d '{"prompt":"ধান পাতায় বাদামী দাগ কেন হয়? সমাধান কী?"}' \
+            | python3 -m json.tool
+
+      - name: ✅ Summary
+        run: echo "Worker test complete!"
