@@ -14,6 +14,7 @@
  */
 
 import { getGeminiKey, getOpenRouterKey } from './apiKeys';
+import { callWorker } from './workerService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -358,7 +359,24 @@ export async function analyzeWithHybridModels(
 
   const log: HybridAnalysisResult['attemptLog'] = [];
 
-  // ── Step 1: Gemini 2.0 Flash (premium, best vision) ──
+  // ── Step 0: Cloudflare Worker (preferred — keys never in app) ──
+  try {
+    console.log('[HybridAnalyzer] Trying Cloudflare Worker...');
+    const workerRes = await callWorker(
+      `Crop: ${cropFamily}. ${query || 'Full diagnostic audit.'}`,
+      imageBase64 || null,
+    );
+    if (workerRes.text) {
+      log.push({ model: 'Cloudflare Worker', status: 'success' });
+      const result = parseAnalysisText(workerRes.text, workerRes.model, 'premium');
+      return { ...result, attemptLog: log };
+    }
+  } catch (err: any) {
+    console.warn('[HybridAnalyzer] Worker failed:', err.message);
+    log.push({ model: 'Cloudflare Worker', status: 'failed', reason: err.message });
+  }
+
+  // ── Step 1: Gemini 2.0 Flash direct (fallback if worker down) ──
   if (imageBase64 && getGeminiKey()) {
     try {
       console.log('[HybridAnalyzer] Trying Gemini 2.0 Flash (premium)...');
@@ -429,7 +447,13 @@ export async function chatWithHybridModels(
 BARI, BRRI, DAE, BARC-এর সুপারিশ অনুসরণ করুন।
 সংক্ষিপ্ত, সহজ ভাষায় ব্যবহারিক পরামর্শ দিন।`;
 
-  // Step 1: Gemini
+  // Step 0: Cloudflare Worker
+  try {
+    const workerRes = await callWorker(message);
+    if (workerRes.text) return { text: workerRes.text, modelUsed: workerRes.model };
+  } catch {}
+
+  // Step 1: Gemini direct fallback
   if (getGeminiKey()) {
     try {
       const contents = [

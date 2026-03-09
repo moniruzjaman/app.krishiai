@@ -1,11 +1,8 @@
-name = "krishiai-ai-gateway"
+name = "app-krishiai"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+account_id = "4a2230e358905ad039e6ee0014fc9ce1"
 
 [vars]
 SERVICE_NAME = "KrishiAI Gateway"
-
-# Secrets (set via: wrangler secret put GEMINI_API_KEY)
-# GEMINI_API_KEY
-# OPENROUTER_API_KEY
