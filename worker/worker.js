@@ -398,8 +398,23 @@ export default {
 
     const { prompt, imageBase64, cropHint } = body;
 
-    // Chat mode
+    // Chat mode or local-classify advisory mode
     if (!imageBase64) {
+      // skipClassify: local model already identified disease, just get advisory
+      if (body.skipClassify && body.cropHint) {
+        try {
+          const diseaseKey = Object.keys(DISEASE_KB).includes(body.cropHint) ? body.cropHint : 'unknown';
+          const { text, model } = await getAdvisory(diseaseKey, body.cropHint, null, env);
+          return new Response(JSON.stringify({
+            text, model,
+            diseaseKey,
+            diseaseName: DISEASE_KB[diseaseKey]?.bn || 'অজানা রোগ',
+            architecture: 'local-classify+cloud-advisory',
+          }), { headers: CORS });
+        } catch (err) {
+          return new Response(JSON.stringify({ error: err.message }), { status: 503, headers: CORS });
+        }
+      }
       if (!prompt?.trim()) return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400, headers: CORS });
       try {
         const result = await handleChat(prompt.trim(), env);
@@ -410,8 +425,15 @@ export default {
     }
 
     // Diagnose mode — hybrid 2-step
+    // skipClassify: app already classified locally, skip Step 1
     try {
-      const { diseaseKey, classifierModel } = await classifyDisease(imageBase64, cropHint || prompt, env);
+      let diseaseKey, classifierModel;
+      if (body.skipClassify && body.cropHint && Object.keys(DISEASE_KB).includes(body.cropHint)) {
+        diseaseKey = body.cropHint;
+        classifierModel = 'mobilenetv2-local';
+      } else {
+        ({ diseaseKey, classifierModel } = await classifyDisease(imageBase64, cropHint || prompt, env));
+      }
       const { text, model: advisoryModel } = await getAdvisory(diseaseKey, cropHint || prompt || 'ফসল', imageBase64, env);
 
       return new Response(JSON.stringify({

@@ -18,15 +18,20 @@ export interface WorkerResponse {
   architecture?: string;
 }
 
-/** Diagnose crop disease from image */
+/** Diagnose crop disease from image, or get advisory for known diseaseKey */
 export async function diagnoseWithWorker(
   imageBase64: string,
-  cropHint?: string,
+  cropHintOrDiseaseKey?: string,
 ): Promise<WorkerResponse> {
+  // If imageBase64 is empty and cropHintOrDiseaseKey is a disease key,
+  // worker skips classification and goes straight to advisory (text-only)
+  const body = imageBase64
+    ? { imageBase64, cropHint: cropHintOrDiseaseKey || '' }
+    : { cropHint: cropHintOrDiseaseKey || '', skipClassify: true };
   const res = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64, cropHint: cropHint || '' }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as any;

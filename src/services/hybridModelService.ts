@@ -15,6 +15,7 @@
 
 import { getGeminiKey, getOpenRouterKey } from './apiKeys';
 import { callWorker, diagnoseWithWorker } from './workerService';
+import { classifyLocally, isLocalModelAvailable } from './localClassifier';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -359,7 +360,24 @@ export async function analyzeWithHybridModels(
 
   const log: HybridAnalysisResult['attemptLog'] = [];
 
-  // ── Step 0: Cloudflare Worker v2 — Hybrid Crop Doctor (preferred) ──
+  // ── Step 0a: Local MobileNetV2 TFLite (on-device, offline, FREE) ──
+  if (imageBase64 && isLocalModelAvailable()) {
+    try {
+      console.log('[HybridAnalyzer] Trying local MobileNetV2...');
+      const local = await classifyLocally(imageBase64);
+      if (local && local.isHighConfidence) {
+        console.log(`[HybridAnalyzer] Local: ${local.diseaseKey} (${(local.confidence*100).toFixed(1)}%)`);
+        // High confidence — skip cloud vision entirely, just get text advisory
+        const workerRes = await diagnoseWithWorker('', local.diseaseKey);
+        const modelLabel = `mobilenetv2→${workerRes.model} (${(local.confidence*100).toFixed(0)}%)`;
+        return { ...parseAnalysisText(workerRes.text, modelLabel, 'premium'), attemptLog: log };
+      }
+    } catch (e) {
+      console.warn('[HybridAnalyzer] Local classifier failed:', e);
+    }
+  }
+
+  // ── Step 0b: Cloudflare Worker v3 — Hybrid Crop Doctor (preferred) ──
   try {
     console.log('[HybridAnalyzer] Trying Cloudflare Worker (hybrid 2-step)...');
     const workerRes = await diagnoseWithWorker(
