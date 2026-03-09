@@ -1,206 +1,71 @@
-# 🌾 KrishiAI AI Gateway v2 — Cloudflare Worker
+# 🌾 KrishiAI Gateway v3 — Cloudflare Worker
 
-Serverless Hybrid Crop Doctor for Bangladesh farmers. Combines lightweight vision classification with AI reasoning to detect crop diseases accurately at low cost.
+Hybrid Crop Doctor with maximum free vision coverage across 6 providers.
 
----
-
-## 🏗️ Architecture — Hybrid Crop Doctor
+## Architecture
 
 ```
-Farmer Mobile App
-      ↓
-      POST { imageBase64, cropHint }
-      ↓
-┌─────────────────────────────────────┐
-│   Cloudflare Worker                 │
-│   app-krishiai.mithun-hstu.workers.dev │
-│                                     │
-│  Step 1: classifyDisease()          │
-│  → Gemini vision (20 tokens only)   │
-│  → Returns disease label            │
-│  e.g. "rice_blast"                  │
-│                ↓                    │
-│  Step 2: getAdvisory()              │
-│  → Disease-specific Bangla prompt   │
-│  → Text only (no image = 80% cheaper│
-│  → 600 tokens focused advisory      │
-└────────────┬────────────────────────┘
-             ↓
-    ┌────────────────┐
-    │ Gemini 2.0     │ ← Primary
-    │ Flash          │
-    └───────┬────────┘
-            │ fail
-    ┌───────▼────────────────────┐
-    │ OpenRouter Free Models     │ ← Fallback
-    │ • deepseek/deepseek-r1     │
-    │ • qwen/qwen-2.5-7b         │
-    │ • mistralai/mistral-7b     │
-    └────────────────────────────┘
-             ↓
-    Bangla advisory for farmer
+Image → Step 1: Classify (20 tokens)  →  Step 2: Advisory (600 tokens)
+         6 vision providers                7 text providers
+         ~0 cost for known diseases
 ```
 
-### Why This Architecture?
+## Vision Cascade (Classifier — Step 1)
 
-| | Old Approach | New Hybrid |
-|---|---|---|
-| Image sent to AI | Every time (full) | Step 1 only (20 tokens) |
-| Advisory tokens | ~1500 per query | ~620 per query |
-| Cost at scale | High | **~70% cheaper** |
-| Accuracy | Generic | Disease-specific |
-| Response time | Slow | Faster |
+| # | Provider | Model | Free Quota | Notes |
+|---|----------|-------|-----------|-------|
+| 1 | Google | gemini-2.5-flash-lite | 1,500/day | Primary |
+| 2 | Google | gemini-2.5-flash | 1,000/day | Fallback |
+| 3 | Google | gemini-2.0-flash | 1,500/day | Reliable fallback |
+| 4 | NVIDIA NIM | kimi-k2.5 | 1,000 credits free signup | Moonshot vision |
+| 5 | Z.AI | glm-4.6v | Free tier | Zhipu vision |
+| 6 | OpenRouter | llama-4-scout:free | 200/day | Meta vision |
 
----
+## Advisory Cascade (Step 2 — text only for known diseases)
 
-## 🦠 Disease Coverage (14 Classes)
+| # | Provider | Model | Free Quota |
+|---|----------|-------|-----------|
+| 1 | Google | gemini-2.5-flash | 1,000/day |
+| 2 | Google | gemini-2.0-flash | 1,500/day |
+| 3 | NVIDIA NIM | kimi-k2.5 | free credits |
+| 4 | Z.AI | glm-4.7 | free tier |
+| 5 | OpenRouter | llama-4-maverick:free | 200/day |
+| 6 | OpenRouter | deepseek-r1:free | 200/day |
+| 7 | OpenRouter | qwen-2.5-7b:free | 200/day |
 
-### Rice
-| Code | Disease | বাংলা |
-|------|---------|-------|
-| `rice_blast` | Leaf/Neck Blast | ব্লাস্ট রোগ |
-| `rice_blight` | Bacterial Leaf Blight | ব্যাকটেরিয়াল ব্লাইট |
-| `rice_brown_spot` | Brown Spot | বাদামী দাগ রোগ |
-| `rice_sheath_blight` | Sheath Blight | শিথ ব্লাইট |
-| `rice_bph` | Brown Planthopper | বাদামী গাছফড়িং |
-| `rice_stem_borer` | Stem Borer | কাণ্ড ছিদ্রকারী পোকা |
+## Required Cloudflare Secrets
 
-### Other Crops
-| Code | Disease | বাংলা |
-|------|---------|-------|
-| `wheat_rust` | Stripe Rust | গমের মরিচা রোগ |
-| `potato_late_blight` | Late Blight | আলুর মড়ক রোগ |
-| `tomato_leaf_curl` | Leaf Curl Virus | টমেটোর পাতা মোড়ানো |
-| `tomato_blight` | Early Blight | আগাম ধ্বসা রোগ |
-| `brinjal_borer` | Shoot & Fruit Borer | বেগুনের ডগা ছিদ্রকারী |
+| Secret | Required | Get From |
+|--------|----------|---------|
+| `GEMINI_API_KEY` | ✅ Primary | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| `OPENROUTER_API_KEY` | ✅ Fallback | [openrouter.ai](https://openrouter.ai/keys) |
+| `NVIDIA_API_KEY` | 🔴 Add now | [build.nvidia.com](https://build.nvidia.com) — free signup, 1000 credits |
+| `ZAI_API_KEY` | 🔴 Add now | [platform.z.ai](https://platform.z.ai) — free tier |
 
-### Nutrient Deficiencies
-| Code | Problem | বাংলা |
-|------|---------|-------|
-| `nitrogen_deficiency` | Nitrogen deficiency | নাইট্রোজেন ঘাটতি |
-| `zinc_deficiency` | Zinc deficiency / Khaira | জিংক ঘাটতি |
-| `healthy` | No disease | পাতা সুস্থ |
+## Disease Coverage (14 classes)
 
----
+Rice: blast, bacterial blight, brown spot, sheath blight, BPH, stem borer  
+Wheat: stripe rust | Potato: late blight  
+Tomato: leaf curl virus, early blight | Brinjal: shoot & fruit borer  
+Deficiency: nitrogen, zinc | Healthy leaf detection
 
-## 🔌 API Usage
+## API
 
-**Base URL:** `https://app-krishiai.mithun-hstu.workers.dev`
+**GET** — Health check → returns cascade config  
+**POST** `{ imageBase64, cropHint }` → diagnose  
+**POST** `{ prompt }` → chat  
 
-### GET — Health Check
-```bash
-curl https://app-krishiai.mithun-hstu.workers.dev
-```
-```json
-{
-  "status": "ok",
-  "service": "KrishiAI Gateway v2",
-  "version": "2.0.0",
-  "architecture": "hybrid-crop-doctor",
-  "diseases_covered": 14
-}
-```
-
-### POST — Diagnose from Image
-```json
-{
-  "imageBase64": "<base64 encoded image>",
-  "cropHint": "ধান"
-}
-```
 **Response:**
 ```json
 {
-  "text": "ধানের ব্লাস্ট রোগ শনাক্ত হয়েছে...",
-  "model": "gemini-2.0-flash",
+  "text": "ধানের ব্লাস্ট রোগ...",
+  "model": "gemini-2.5-flash",
+  "classifierModel": "gemini-2.5-flash-lite",
   "diseaseKey": "rice_blast",
   "diseaseName": "ধানের ব্লাস্ট রোগ",
-  "architecture": "hybrid-2step"
+  "architecture": "hybrid-2step-v3"
 }
 ```
 
-### POST — Chat (text only)
-```json
-{
-  "prompt": "ধান পাতায় বাদামী দাগ কেন হয়?"
-}
-```
-**Response:**
-```json
-{
-  "text": "ধান পাতায় বাদামী দাগ হলো...",
-  "model": "gemini-2.0-flash"
-}
-```
-
----
-
-## 🔐 Secrets Required
-
-Set in Cloudflare Workers dashboard → Settings → Variables & Secrets:
-
-| Secret | Description | Get From |
-|--------|-------------|----------|
-| `GEMINI_API_KEY` | Google Gemini API key | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
-| `OPENROUTER_API_KEY` | OpenRouter key (free models) | [openrouter.ai](https://openrouter.ai) |
-
----
-
-## 🚀 Deploy
-
-Deployment is automated via GitHub Actions on every push to `worker/worker.js`.
-
-**Manual deploy:**
-1. Go to [GitHub Actions](https://github.com/moniruzjaman/app.krishiai/actions)
-2. Click **"🚀 Deploy Cloudflare Worker"**
-3. Click **"Run workflow"**
-
-**Required GitHub Secrets:**
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1 ✅ (Current)
-- [x] Hybrid 2-step classifier + advisory
-- [x] 14 disease classes for major Bangladesh crops
-- [x] Bangla advisory with DAE/BRRI/BARI pesticide doses
-- [x] OpenRouter free model fallback
-
-### Phase 2 (Planned)
-- [ ] TensorFlow Lite edge classifier (offline, no API cost)
-- [ ] Disease coverage: chili, jute, mustard, onion
-- [ ] Pest recognition: leaf roller, whorl maggot
-- [ ] Seasonal outbreak alerts
-
-### Phase 3 (Future)
-- [ ] WhatsApp Bot — farmers send leaf photo → get advice
-- [ ] Messenger Bot — same via Facebook
-- [ ] SMS fallback for feature phones (16123 integration)
-- [ ] National pest outbreak heatmap
-
----
-
-## 🌍 Impact for Bangladesh
-
-With integration into DAE's extension network, this system can support:
-
-- **Farmer advisory at scale** — instant diagnosis without visiting upazila office
-- **Early pest outbreak alerts** — aggregate reports by district/upazila
-- **Real-time crop health monitoring** — integration with weather risk engine
-- **National agricultural AI platform** — scalable to millions of farmers
-
-> *"Eventually your system becomes a digital crop doctor."*
-
----
-
-## 📁 Files
-
-```
-worker/
-  worker.js      — Cloudflare Worker source (hybrid crop doctor)
-  wrangler.toml  — Cloudflare deployment config
-  README.md      — This file
-```
+## Deploy
+Auto-deploys via GitHub Actions on push to `worker/worker.js`.

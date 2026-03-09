@@ -1,32 +1,53 @@
 /**
- * KrishiAI Gateway v2 — Cloudflare Worker
- * HYBRID CROP DOCTOR: 2-step classify then advise
- * Reduces AI token usage 70-80% vs raw image analysis
+ * KrishiAI Gateway v3 — Cloudflare Worker
+ * HYBRID CROP DOCTOR — Maximum Free Vision Coverage
+ *
+ * CLASSIFIER cascade (image → label, ~20 tokens):
+ *   1. Gemini 2.5 Flash-Lite  — Google      1500/day FREE
+ *   2. Gemini 2.5 Flash       — Google      1000/day FREE
+ *   3. Gemini 2.0 Flash       — Google      1500/day FREE
+ *   4. Kimi K2.5              — NVIDIA NIM  1000 credits FREE signup
+ *   5. GLM-4.6V               — Z.AI        free tier
+ *   6. llama-4-scout:free     — OpenRouter  200/day FREE
+ *
+ * ADVISORY cascade (text prompt, ~600 tokens):
+ *   1. Gemini 2.5 Flash       — Google      FREE
+ *   2. Gemini 2.0 Flash       — Google      FREE
+ *   3. Kimi K2.5 (text)       — NVIDIA NIM  FREE credits
+ *   4. GLM-4.7                — Z.AI        free tier
+ *   5. llama-4-maverick:free  — OpenRouter  FREE
+ *   6. deepseek-r1:free       — OpenRouter  FREE
+ *   7. qwen-2.5-7b:free       — OpenRouter  FREE
+ *
+ * New providers vs v2:
+ *   + NVIDIA NIM  → Kimi K2.5 vision (free signup credits)
+ *   + Z.AI        → GLM-4.6V vision + GLM-4.7 text (free tier)
+ *   + Gemini 2.5  → upgraded from 2.0
  */
 
-const CORS_HEADERS = {
+const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json',
 };
 
+// ── Disease Knowledge Base ────────────────────────────────────────────────────
 const DISEASE_KB = {
   rice_blast: {
     bn: 'ধানের ব্লাস্ট রোগ',
     prompt: `রোগ: ধানের ব্লাস্ট রোগ (Pyricularia oryzae)। ফসল: {crop}।
-বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দের মধ্যে):
-১. লক্ষণ  ২. কারণ  ৩. ছত্রাকনাশক (DAE অনুমোদিত, ডোজসহ)  ৪. প্রতিরোধী জাত (BRRI dhan28/29)`,
+বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): লক্ষণ, কারণ, ছত্রাকনাশক ডোজ (DAE অনুমোদিত), প্রতিরোধী জাত (BRRI dhan28/29)।`,
   },
   rice_blight: {
     bn: 'ধানের ব্যাকটেরিয়াল ব্লাইট',
     prompt: `রোগ: ধানের ব্যাকটেরিয়াল লিফ ব্লাইট (Xanthomonas oryzae)। ফসল: {crop}।
-বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): লক্ষণ, কারণ, কপার স্প্রে ডোজ, প্রতিরোধী জাত।`,
+বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): লক্ষণ, কপার স্প্রে ডোজ, প্রতিরোধী জাত।`,
   },
   rice_brown_spot: {
     bn: 'ধানের বাদামী দাগ রোগ',
     prompt: `রোগ: ধানের বাদামী দাগ রোগ (Helminthosporium oryzae)। ফসল: {crop}।
-বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): লক্ষণ, কারণ, ম্যানকোজেব স্প্রে ডোজ, পটাশ সার।`,
+বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): লক্ষণ, ম্যানকোজেব ডোজ, পটাশ সার।`,
   },
   rice_sheath_blight: {
     bn: 'ধানের শিথ ব্লাইট',
@@ -61,7 +82,7 @@ const DISEASE_KB = {
   tomato_blight: {
     bn: 'টমেটোর আগাম ধ্বসা রোগ',
     prompt: `রোগ: টমেটোর আগাম ধ্বসা রোগ (Alternaria solani)। ফসল: {crop}।
-বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): চক্রাকার দাগ লক্ষণ, ম্যানকোজেব ডোজ, mulching।`,
+বাংলাদেশের কৃষকের জন্য লিখুন (১৫০ শব্দ): চক্রাকার দাগ লক্ষণ, ম্যানকোজেব ডোজ।`,
   },
   brinjal_borer: {
     bn: 'বেগুনের ডগা ও ফল ছিদ্রকারী পোকা',
@@ -86,176 +107,327 @@ const DISEASE_KB = {
 };
 
 const DISEASE_LABELS = Object.keys(DISEASE_KB).join(', ');
+const CLASSIFY_PROMPT = `You are a plant disease classifier for Bangladesh crops.
+Crop hint: {crop}. Examine this image carefully.
+Reply with ONLY one label from this exact list (no punctuation, no explanation):
+${DISEASE_LABELS}
+If none match, reply: unknown`;
 
-async function classifyDisease(imageBase64, cropHint, geminiKey) {
+// ── Helper: OpenAI-compatible vision call ─────────────────────────────────────
+async function callVision(baseUrl, apiKey, model, imageBase64, textPrompt, maxTokens = 20) {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+          { type: 'text', text: textPrompt },
+        ],
+      }],
+      max_tokens: maxTokens,
+      temperature: 0.1,
+    }),
+  });
+  if (!res.ok) throw new Error(`${model} ${res.status}`);
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error(`${model} empty response`);
+  return text;
+}
+
+// ── Helper: OpenAI-compatible text call ──────────────────────────────────────
+async function callText(baseUrl, apiKey, model, prompt, maxTokens = 600, extraHeaders = {}) {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxTokens,
+      temperature: 0.3,
+    }),
+  });
+  if (!res.ok) throw new Error(`${model} ${res.status}`);
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error(`${model} empty`);
+  return { text, model };
+}
+
+// ── Gemini native call (vision or text) ──────────────────────────────────────
+async function callGemini(model, prompt, imageBase64, apiKey, maxTokens = 600) {
+  const parts = imageBase64
+    ? [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
+    : [{ text: prompt }];
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } },
-            { text: `Crop: ${cropHint || 'unknown'}. Classify this plant image. Reply with ONLY one label from: ${DISEASE_LABELS}. No explanation.` },
-          ],
-        }],
-        generationConfig: { maxOutputTokens: 15, temperature: 0.1 },
+        contents: [{ parts }],
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.1 },
       }),
     }
   );
-  if (!res.ok) throw new Error(`Classify ${res.status}`);
+  if (!res.ok) throw new Error(`Gemini ${model} ${res.status}`);
   const data = await res.json();
-  const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim().toLowerCase().replace(/[^a-z_]/g, '');
-  return Object.keys(DISEASE_KB).find(k => raw === k || raw.includes(k)) || 'unknown';
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!text) throw new Error(`Gemini ${model} empty`);
+  return text;
 }
 
-async function getAdvisory(diseaseKey, crop, imageBase64, geminiKey, openRouterKey) {
+// ── Step 1: Classify disease from image ──────────────────────────────────────
+async function classifyDisease(imageBase64, cropHint, env) {
+  const prompt = CLASSIFY_PROMPT.replace('{crop}', cropHint || 'unknown');
+
+  const attempts = [
+    // 1. Gemini 2.5 Flash-Lite — 1500/day free
+    async () => {
+      const text = await callGemini('gemini-2.5-flash-lite-preview-06-17', prompt, imageBase64, env.GEMINI_API_KEY, 15);
+      return { text, model: 'gemini-2.5-flash-lite' };
+    },
+    // 2. Gemini 2.5 Flash — 1000/day free
+    async () => {
+      const text = await callGemini('gemini-2.5-flash-preview-05-20', prompt, imageBase64, env.GEMINI_API_KEY, 15);
+      return { text, model: 'gemini-2.5-flash' };
+    },
+    // 3. Gemini 2.0 Flash — reliable fallback
+    async () => {
+      const text = await callGemini('gemini-2.0-flash', prompt, imageBase64, env.GEMINI_API_KEY, 15);
+      return { text, model: 'gemini-2.0-flash' };
+    },
+    // 4. Kimi K2.5 — NVIDIA NIM (1000 free credits on signup)
+    async () => {
+      if (!env.NVIDIA_API_KEY) throw new Error('no NVIDIA key');
+      const text = await callVision(
+        'https://integrate.api.nvidia.com/v1',
+        env.NVIDIA_API_KEY,
+        'moonshotai/kimi-k2.5',
+        imageBase64, prompt, 15
+      );
+      return { text, model: 'kimi-k2.5' };
+    },
+    // 5. GLM-4.6V — Z.AI free tier
+    async () => {
+      if (!env.ZAI_API_KEY) throw new Error('no ZAI key');
+      const text = await callVision(
+        'https://api.z.ai/v1',
+        env.ZAI_API_KEY,
+        'glm-4.6v',
+        imageBase64, prompt, 15
+      );
+      return { text, model: 'glm-4.6v' };
+    },
+    // 6. Llama 4 Scout — OpenRouter free
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      const text = await callVision(
+        'https://openrouter.ai/api/v1',
+        env.OPENROUTER_API_KEY,
+        'meta-llama/llama-4-scout:free',
+        imageBase64, prompt, 15
+      );
+      return { text, model: 'llama-4-scout' };
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const { text, model } = await attempt();
+      const raw = text.toLowerCase().replace(/[^a-z_]/g, '');
+      const match = Object.keys(DISEASE_KB).find(k => raw === k || raw.includes(k));
+      if (match) return { diseaseKey: match, classifierModel: model };
+    } catch (e) {}
+  }
+
+  return { diseaseKey: 'unknown', classifierModel: 'none' };
+}
+
+// ── Step 2: Generate advisory ─────────────────────────────────────────────────
+async function getAdvisory(diseaseKey, crop, imageBase64, env) {
   const disease = DISEASE_KB[diseaseKey];
-  let prompt;
-  if (disease) {
-    prompt = disease.prompt.replace('{crop}', crop || 'ফসল');
-  } else {
-    prompt = `ফসল: ${crop || 'অজানা'}। এই ছবি দেখে রোগ/পোকা শনাক্ত করুন। বাংলাদেশ DAE/BARI/BRRI সুপারিশ অনুযায়ী সহজ বাংলায় পরামর্শ দিন। ১৫০ শব্দের মধ্যে।`;
-  }
+  const prompt = disease
+    ? disease.prompt.replace('{crop}', crop || 'ফসল')
+    : `ফসল: ${crop || 'অজানা'}। এই ফসলের ছবি দেখে রোগ/পোকা শনাক্ত করুন। বাংলাদেশ DAE/BARI/BRRI সুপারিশ অনুযায়ী সহজ বাংলায় পরামর্শ দিন। ১৫০ শব্দ।`;
 
-  // Gemini — use image only for unknown disease
-  if (geminiKey) {
+  // For unknown: include image. For known: text-only (80% cheaper)
+  const useImage = diseaseKey === 'unknown' && imageBase64;
+
+  const attempts = [
+    // 1. Gemini 2.5 Flash
+    async () => {
+      const text = await callGemini('gemini-2.5-flash-preview-05-20', prompt, useImage ? imageBase64 : null, env.GEMINI_API_KEY, 700);
+      return { text, model: 'gemini-2.5-flash' };
+    },
+    // 2. Gemini 2.0 Flash
+    async () => {
+      const text = await callGemini('gemini-2.0-flash', prompt, useImage ? imageBase64 : null, env.GEMINI_API_KEY, 700);
+      return { text, model: 'gemini-2.0-flash' };
+    },
+    // 3. Kimi K2.5 text — NVIDIA NIM
+    async () => {
+      if (!env.NVIDIA_API_KEY) throw new Error('no NVIDIA key');
+      return callText('https://integrate.api.nvidia.com/v1', env.NVIDIA_API_KEY, 'moonshotai/kimi-k2.5', prompt, 700);
+    },
+    // 4. GLM-4.7 text — Z.AI
+    async () => {
+      if (!env.ZAI_API_KEY) throw new Error('no ZAI key');
+      return callText('https://api.z.ai/v1', env.ZAI_API_KEY, 'glm-4.7', prompt, 700);
+    },
+    // 5. Llama 4 Maverick — OpenRouter
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'meta-llama/llama-4-maverick:free', prompt, 700,
+        { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
+    },
+    // 6. DeepSeek R1 — OpenRouter
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'deepseek/deepseek-r1:free', prompt, 700,
+        { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
+    },
+    // 7. Qwen 2.5 7B — OpenRouter
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'qwen/qwen-2.5-7b-instruct:free', prompt, 700,
+        { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
+    },
+  ];
+
+  for (const attempt of attempts) {
     try {
-      const parts = (diseaseKey === 'unknown' && imageBase64)
-        ? [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
-        : [{ text: prompt }];
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
-          }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return { text, model: 'gemini-2.0-flash' };
-      }
+      const result = await attempt();
+      if (result?.text) return result;
     } catch (e) {}
   }
 
-  // OpenRouter fallback
-  for (const model of ['deepseek/deepseek-r1:free', 'qwen/qwen-2.5-7b-instruct:free', 'mistralai/mistral-7b-instruct:free']) {
-    if (!openRouterKey) break;
-    try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openRouterKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' },
-        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 600, temperature: 0.3 }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.choices?.[0]?.message?.content;
-        if (text) return { text, model };
-      }
-    } catch (e) {}
-  }
-  throw new Error('All providers failed');
+  throw new Error('All advisory providers failed');
 }
 
-async function handleChat(prompt, geminiKey, openRouterKey) {
+// ── Chat handler (text only) ──────────────────────────────────────────────────
+async function handleChat(prompt, env) {
   const sys = `আপনি কৃষি AI — বাংলাদেশের কৃষকদের বিশেষজ্ঞ। BARI, BRRI, DAE, BARC সুপারিশ মেনে সহজ বাংলায় উত্তর দিন।`;
-  if (geminiKey) {
+  const fullPrompt = `${sys}\n\n${prompt}`;
+
+  const attempts = [
+    async () => {
+      const text = await callGemini('gemini-2.5-flash-preview-05-20', fullPrompt, null, env.GEMINI_API_KEY, 800);
+      return { text, model: 'gemini-2.5-flash' };
+    },
+    async () => {
+      const text = await callGemini('gemini-2.0-flash', fullPrompt, null, env.GEMINI_API_KEY, 800);
+      return { text, model: 'gemini-2.0-flash' };
+    },
+    async () => {
+      if (!env.NVIDIA_API_KEY) throw new Error('no NVIDIA key');
+      return callText('https://integrate.api.nvidia.com/v1', env.NVIDIA_API_KEY, 'moonshotai/kimi-k2.5', fullPrompt, 800);
+    },
+    async () => {
+      if (!env.ZAI_API_KEY) throw new Error('no ZAI key');
+      return callText('https://api.z.ai/v1', env.ZAI_API_KEY, 'glm-4.7', fullPrompt, 800);
+    },
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'meta-llama/llama-4-maverick:free', fullPrompt, 800,
+        { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
+    },
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'deepseek/deepseek-r1:free', fullPrompt, 800,
+        { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
+    },
+    async () => {
+      if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
+      return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'qwen/qwen-2.5-7b-instruct:free', fullPrompt, 800,
+        { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
+    },
+  ];
+
+  for (const attempt of attempts) {
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: sys }] },
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 800, temperature: 0.4 },
-          }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return { text, model: 'gemini-2.0-flash' };
-      }
+      const result = await attempt();
+      if (result?.text) return result;
     } catch (e) {}
   }
-  for (const model of ['deepseek/deepseek-r1:free', 'qwen/qwen-2.5-7b-instruct:free', 'mistralai/mistral-7b-instruct:free']) {
-    if (!openRouterKey) break;
-    try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openRouterKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://krishiai.live' },
-        body: JSON.stringify({ model, messages: [{ role: 'system', content: sys }, { role: 'user', content: prompt }], max_tokens: 600 }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.choices?.[0]?.message?.content;
-        if (text) return { text, model };
-      }
-    } catch (e) {}
-  }
-  throw new Error('All providers unavailable');
+
+  throw new Error('All chat providers failed');
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
+    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     if (request.method === 'GET') {
       return new Response(JSON.stringify({
         status: 'ok',
-        service: 'KrishiAI Gateway v2',
-        version: '2.0.0',
+        service: 'KrishiAI Gateway v3',
+        version: '3.0.0',
         architecture: 'hybrid-crop-doctor',
+        classifier_cascade: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash', 'kimi-k2.5', 'glm-4.6v', 'llama-4-scout'],
+        advisory_cascade: ['gemini-2.5-flash', 'gemini-2.0-flash', 'kimi-k2.5', 'glm-4.7', 'llama-4-maverick', 'deepseek-r1', 'qwen-2.5-7b'],
         diseases_covered: Object.keys(DISEASE_KB).length,
-        crops: ['rice', 'wheat', 'potato', 'tomato', 'brinjal', 'general'],
         timestamp: new Date().toISOString(),
-      }), { headers: CORS_HEADERS });
+      }), { headers: CORS });
     }
 
-    if (request.method !== 'POST') return new Response(JSON.stringify({ error: 'POST required' }), { status: 405, headers: CORS_HEADERS });
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'POST required' }), { status: 405, headers: CORS });
+    }
 
     let body;
     try { body = await request.json(); }
-    catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: CORS_HEADERS }); }
+    catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: CORS }); }
 
     const { prompt, imageBase64, cropHint } = body;
 
-    // Chat mode — text only
+    // Chat mode
     if (!imageBase64) {
-      if (!prompt?.trim()) return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400, headers: CORS_HEADERS });
+      if (!prompt?.trim()) return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400, headers: CORS });
       try {
-        const result = await handleChat(prompt.trim(), env.GEMINI_API_KEY, env.OPENROUTER_API_KEY);
-        return new Response(JSON.stringify(result), { headers: CORS_HEADERS });
+        const result = await handleChat(prompt.trim(), env);
+        return new Response(JSON.stringify(result), { headers: CORS });
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 503, headers: CORS_HEADERS });
+        return new Response(JSON.stringify({ error: err.message }), { status: 503, headers: CORS });
       }
     }
 
     // Diagnose mode — hybrid 2-step
     try {
-      let diseaseKey = 'unknown';
-      if (env.GEMINI_API_KEY) {
-        try { diseaseKey = await classifyDisease(imageBase64, cropHint || prompt, env.GEMINI_API_KEY); }
-        catch (e) {}
-      }
-      const { text, model } = await getAdvisory(diseaseKey, cropHint || prompt || 'ফসল', imageBase64, env.GEMINI_API_KEY, env.OPENROUTER_API_KEY);
+      const { diseaseKey, classifierModel } = await classifyDisease(imageBase64, cropHint || prompt, env);
+      const { text, model: advisoryModel } = await getAdvisory(diseaseKey, cropHint || prompt || 'ফসল', imageBase64, env);
+
       return new Response(JSON.stringify({
         text,
-        model,
+        model: advisoryModel,
+        classifierModel,
         diseaseKey,
         diseaseName: DISEASE_KB[diseaseKey]?.bn || 'অজানা রোগ',
-        architecture: 'hybrid-2step',
-      }), { headers: CORS_HEADERS });
+        architecture: 'hybrid-2step-v3',
+      }), { headers: CORS });
+
     } catch (err) {
-      return new Response(JSON.stringify({ error: 'সব AI প্রদানকারী অনুপলব্ধ।', detail: err.message }), { status: 503, headers: CORS_HEADERS });
+      return new Response(JSON.stringify({
+        error: 'সব AI প্রদানকারী অনুপলব্ধ।',
+        detail: err.message,
+      }), { status: 503, headers: CORS });
     }
   },
 };
