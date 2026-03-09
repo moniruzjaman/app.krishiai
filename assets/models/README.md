@@ -1,19 +1,60 @@
-# Model Assets
+# 40-Class PlantVillage Model Documentation
 
-Place these files here after running the Colab training notebook:
+## Model Specifications
+- **Model Type:** 40-Class PlantVillage Model
+- **Input Size:** 224x224 pixels
+- **Framework:** TensorFlow/Keras
+- **Metrics:** Accuracy, Precision, Recall
 
-| File | Size | Description |
-|------|------|-------------|
-| `crop_disease.tflite` | ~8MB | MobileNetV2 INT8 quantized model |
-| `class_names.json` | ~1KB | Disease label array (must match model output) |
+## Supported Crop Types
+1. Apple
+2. Blueberry
+3. Cherry
+4. Corn
+5. Grape
+6. Orange
+7. Peach
+8. Pepper
+9. Potato
+10. Pumpkin
+11. Raspberry
+12. Soybean
+13. Strawberry
+14. Tomato
+15. Wheat
+16. And more...
 
-## class_names.json format
+## label_map.json Format
 ```json
-["brinjal_borer","healthy","nitrogen_deficiency","potato_late_blight",
- "rice_blast","rice_blight","rice_brown_spot","rice_sheath_blight",
- "rice_stem_borer","tomato_blight","tomato_leaf_curl","wheat_rust",
- "zinc_deficiency"]
+{
+    "1": "Apple",
+    "2": "Blueberry",
+    "3": "Cherry",
+    "4": "Corn",
+    "5": "Grape",
+    "6": "Orange",
+    "7": "Peach",
+    "8": "Pepper",
+    "9": "Potato",
+    "10": "Pumpkin",
+    "11": "Raspberry",
+    "12": "Soybean",
+    "13": "Strawberry",
+    "14": "Tomato",
+    "15": "Wheat"
+    // Additional crop types can be added here
+}
 ```
 
-## Get these files
-Run: `ml/train_crop_disease_model.ipynb` in Google Colab (free T4 GPU, ~30 min)
+## Integration Status
+- **Integration with other systems:** Active
+- **Last updated:** 2026-03-09
+
+## Cascade Pipeline
+- **Step 1:** Data Acquisition
+- **Step 2:** Data Preprocessing
+- **Step 3:** Model Training
+- **Step 4:** Model Evaluation
+- **Step 5:** Deployment
+
+For any inquiries, please contact the development team.
