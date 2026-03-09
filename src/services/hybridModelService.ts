@@ -14,7 +14,7 @@
  */
 
 import { getGeminiKey, getOpenRouterKey } from './apiKeys';
-import { callWorker } from './workerService';
+import { callWorker, diagnoseWithWorker } from './workerService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -359,16 +359,17 @@ export async function analyzeWithHybridModels(
 
   const log: HybridAnalysisResult['attemptLog'] = [];
 
-  // ── Step 0: Cloudflare Worker (preferred — keys never in app) ──
+  // ── Step 0: Cloudflare Worker v2 — Hybrid Crop Doctor (preferred) ──
   try {
-    console.log('[HybridAnalyzer] Trying Cloudflare Worker...');
-    const workerRes = await callWorker(
-      `Crop: ${cropFamily}. ${query || 'Full diagnostic audit.'}`,
-      imageBase64 || null,
+    console.log('[HybridAnalyzer] Trying Cloudflare Worker (hybrid 2-step)...');
+    const workerRes = await diagnoseWithWorker(
+      imageBase64!,
+      cropFamily || 'ফসল',
     );
     if (workerRes.text) {
       log.push({ model: 'Cloudflare Worker', status: 'success' });
-      const result = parseAnalysisText(workerRes.text, workerRes.model, 'premium');
+      const modelLabel = workerRes.diseaseName ? `${workerRes.model} → ${workerRes.diseaseName}` : workerRes.model;
+      const result = parseAnalysisText(workerRes.text, modelLabel, 'premium');
       return { ...result, attemptLog: log };
     }
   } catch (err: any) {
