@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
 import { AGRI_SEASONS, CROPS_BY_CATEGORY } from '../../src/constants';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const CROPS = ['ধান', 'গম', 'আলু', 'সরিষা', 'ভুট্টা', 'পাট', 'আখ', 'টমেটো'];
 
@@ -26,7 +27,9 @@ export default function CropCalendarScreen() {
         `${season?.name} মৌসুমে ${selectedCrop} চাষের সম্পূর্ণ পঞ্জিকা দিন। বীজ বপন, সার প্রয়োগ, সেচ, রোগ দমন ও ফসল কাটার সময়সূচি BRRI/BARI অনুযায়ী দিন।`
       );
       setAdvice(prev => ({ ...prev, [key]: text }));
-    } catch { setAdvice(prev => ({ ...prev, [`${activeSeason}-${selectedCrop}`]: 'তথ্য লোড হয়নি।' })); }
+    } catch (e) {
+      setAdvice(prev => ({ ...prev, [`${activeSeason}-${selectedCrop}`]: `❌ ${getErrorMsg(e)}` }));
+    }
     finally { setLoading(false); }
   };
 

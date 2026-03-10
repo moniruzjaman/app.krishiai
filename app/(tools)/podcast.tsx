@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const THEMES = [
   { id: 'news', title: 'আজকের কৃষি সংবাদ', icon: '📰', prompt: 'বাংলাদেশের আজকের প্রধান কৃষি সংবাদ ও বাজার দর পডকাস্ট স্টাইলে বলুন।' },
@@ -30,7 +31,9 @@ export default function PodcastScreen() {
         `আপনি একজন কৃষি রেডিও উপস্থাপক। নিচের বিষয়ে ৩-৪ মিনিটের পডকাস্ট স্ক্রিপ্ট লিখুন। শুরুতে আকর্ষণীয় ইন্ট্রো, মাঝে মূল তথ্য এবং শেষে কৃষকদের জন্য সহজ পরামর্শ দিন।\n\nবিষয়: ${selectedTheme.prompt}`
       );
       setScript(text);
-    } catch { setScript('পডকাস্ট তৈরি হয়নি। আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      setScript(`❌ ${getErrorMsg(e)}`);
+    }
     finally { setLoading(false); }
   };
 

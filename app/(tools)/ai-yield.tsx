@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const CROPS = ['ধান', 'গম', 'আলু', 'ভুট্টা', 'সরিষা', 'পাট', 'আখ'];
 const LAND_TYPES = ['উঁচু জমি', 'মাঝারি উঁচু', 'মাঝারি নিচু', 'নিচু জমি'];
@@ -44,7 +45,9 @@ export default function AIYieldScreen() {
         `ফলন পূর্বাভাস দিন:\n- ফসল: ${crop}\n- এলাকা: ${district || 'বাংলাদেশ'}\n- জমি: ${area} শতাংশ, ${landType}\n- মাটি: ${soilStatus}\n- ব্যবস্থাপনা: ${practice}\n- সেচ: ${water}\n${notes ? `- বিশেষ তথ্য: ${notes}` : ''}\nBRRI/BARI ডেটার ভিত্তিতে হেক্টর প্রতি ও বিঘা প্রতি সম্ভাব্য ফলন, উন্নতির উপায় এবং লাভ-লোকসানের পূর্বাভাস দিন।`
       );
       setPrediction(text);
-    } catch { Alert.alert('ত্রুটি', 'আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      Alert.alert('সংযোগ সমস্যা', getErrorMsg(e));
+    }
     finally { setLoading(false); }
   };
 

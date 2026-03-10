@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { analyzeWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const VARIETIES = ['BRRI dhan28', 'BRRI dhan29', 'BRRI dhan74', 'BRRI dhan89', 'অন্যান্য জাত'];
 const LCC_COLORS = ['#f5f0e8','#d4c97a','#a8b84c','#6a8c2e','#3d5c1a'];
@@ -55,7 +56,9 @@ export default function LeafColorScreen() {
       setLcc(lccVal);
       setAiInsight(result.advisory || result.diagnosis);
       setStep(2);
-    } catch { Alert.alert('ত্রুটি', 'বিশ্লেষণ ব্যর্থ হয়েছে।'); }
+    } catch (e) {
+      Alert.alert('সংযোগ সমস্যা', getErrorMsg(e));
+    }
     finally { setLoading(false); }
   };
 

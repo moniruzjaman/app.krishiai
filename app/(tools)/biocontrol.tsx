@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const CATEGORIES = [
   { id: 'all', label: 'সব', icon: '🌿' },
@@ -40,7 +41,9 @@ export default function BiocontrolScreen() {
         `জৈবিক বালাই দমন বিশেষজ্ঞ হিসেবে উত্তর দিন: ${query}। DAE/BARI অনুমোদিত পদ্ধতি ব্যবহার করুন।`
       );
       setAdvice(text);
-    } catch { setAdvice('তথ্য পাওয়া যায়নি। আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      setAdvice(`❌ ${getErrorMsg(e)}`);
+    }
     finally { setLoading(false); }
   };
 

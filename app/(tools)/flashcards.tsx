@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 interface FlashCard { question: string; answer: string; }
 
@@ -32,7 +33,9 @@ export default function FlashcardsScreen() {
         setScore({ correct: 0, wrong: 0 });
         setMode('learning');
       } else { Alert.alert('', 'কার্ড তৈরি হয়নি। আবার চেষ্টা করুন।'); }
-    } catch { Alert.alert('ত্রুটি', 'আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      Alert.alert('সংযোগ সমস্যা', getErrorMsg(e));
+    }
     finally { setLoading(false); }
   };
 

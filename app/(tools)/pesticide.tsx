@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const TABS = [{ id: 'advisor', label: '💊 পরামর্শ' }, { id: 'mixing', label: '🧪 মিশ্রণ' }, { id: 'rotation', label: '🔄 রোটেশন' }];
 const CROPS = ['ধান', 'গম', 'আলু', 'টমেটো', 'বেগুন', 'পেঁয়াজ', 'সরিষা', 'ভুট্টা'];
@@ -26,7 +27,9 @@ export default function PesticideScreen() {
     try {
       const { text } = await chatWithHybridModels(prompt);
       setResult(text);
-    } catch { Alert.alert('ত্রুটি', 'আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      Alert.alert('সংযোগ সমস্যা', getErrorMsg(e));
+    }
     finally { setLoading(false); }
   };
 

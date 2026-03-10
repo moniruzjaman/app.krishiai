@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Modal,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
 
 type TaskCategory = 'irrigation' | 'fertilizer' | 'pesticide' | 'harvest' | 'other';

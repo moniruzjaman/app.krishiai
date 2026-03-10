@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
+import { withRetry, getErrorMsg, OFFLINE_MSG } from '../../src/utils/network';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
 
 // ─── Free map stack ──────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ export default function FieldMapScreen() {
         }));
         setPlaces(ps);
       }
-    } catch { setPlaces([]); }
+    } catch (e) { setPlaces([]); console.warn('Map places error:', getErrorMsg(e)); }
     finally { setLoading(false); }
   };
 

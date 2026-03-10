@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const TABS = [{ id: 'audit', label: '🧪 অডিট' }, { id: 'texture', label: '🌍 বুনট' }, { id: 'organic', label: '♻️ জৈব সার' }];
 const SOIL_TYPES = ['দোআঁশ', 'বেলে দোআঁশ', 'এঁটেল', 'পলি দোআঁশ', 'বেলে'];
@@ -29,7 +30,9 @@ export default function SoilExpertScreen() {
     try {
       const { text } = await chatWithHybridModels(prompt);
       setResult(text);
-    } catch { Alert.alert('ত্রুটি', 'আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      Alert.alert('সংযোগ সমস্যা', getErrorMsg(e));
+    }
     finally { setLoading(false); }
   };
 

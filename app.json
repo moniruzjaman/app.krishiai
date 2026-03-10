@@ -3,7 +3,7 @@
     "name": "Krishi AI",
     "slug": "krishi-ai",
     "owner": "moniruzjaman",
-    "version": "2.5.4",
+    "version": "2.5.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "krishiai",
@@ -30,7 +30,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A8A1F"
       },
-      "versionCode": 15,
+      "versionCode": 16,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",

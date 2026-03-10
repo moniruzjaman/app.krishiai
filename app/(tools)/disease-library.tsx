@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { chatWithHybridModels } from '../../src/services/hybridModelService';
 import { CROP_CATEGORIES, CROPS_BY_CATEGORY } from '../../src/constants';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 export default function DiseaseLibraryScreen() {
   const router = useRouter();
@@ -23,7 +24,9 @@ export default function DiseaseLibraryScreen() {
         `${crop} ফসলের প্রধান রোগ ও পোকামাকড়ের তালিকা দিন। প্রতিটির জন্য: লক্ষণ, জৈব প্রতিকার ও রাসায়নিক প্রতিকার বলুন। BARI/BRRI/DAE সূত্র উল্লেখ করুন।`
       );
       setReport(text);
-    } catch { setReport('তথ্য লোড হয়নি। আবার চেষ্টা করুন।'); }
+    } catch (e) {
+      setReport(`❌ ${getErrorMsg(e)}\nসংযোগ পুনরুদ্ধার হলে আবার চেষ্টা করুন।`);
+    }
     finally { setLoading(false); }
   };
 

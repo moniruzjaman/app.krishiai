@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { analyzeWithHybridModels } from '../../src/services/hybridModelService';
+import { withRetry, getErrorMsg } from '../../src/utils/network';
 
 const MONITOR_TYPES = [
   { id: 'disease', label: 'রোগ পর্যবেক্ষণ', icon: '🔬' },
@@ -66,7 +67,9 @@ export default function FieldMonitoringScreen() {
         lang: 'bn',
       });
       setReport(`📊 মাঠ পর্যবেক্ষণ রিপোর্ট\n\n🔍 রোগ/সমস্যা: ${result.diagnosis}\n📂 শ্রেণী: ${result.category}\n💯 নিশ্চয়তা: ${result.confidence}%\n\n💡 পরামর্শ:\n${result.advisory}\n\n📌 সূত্র: ${result.officialSource}`);
-    } catch { Alert.alert('ত্রুটি', 'পর্যবেক্ষণ ব্যর্থ।'); }
+    } catch (e) {
+      Alert.alert('সংযোগ সমস্যা', getErrorMsg(e));
+    }
     finally { setLoading(false); }
   };
 
