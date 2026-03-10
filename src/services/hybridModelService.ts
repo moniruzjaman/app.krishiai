@@ -13,7 +13,7 @@
  *   EXPO_PUBLIC_OPENROUTER_API_KEY  — OpenRouter (free + paid models)
  */
 
-import { getGeminiKey, getOpenRouterKey } from './apiKeys';
+import { getGeminiApiKey, getOpenRouterApiKey } from './apiKeys';
 import { callWorker, diagnoseWithWorker } from './workerService';
 import { classifyLocally, isLocalModelAvailable } from './localClassifier';
 
@@ -188,7 +188,7 @@ async function analyzeWithGemini(
   lang: string,
   query?: string,
 ): Promise<AnalysisResult> {
-  const apiKey = getGeminiKey();
+  const apiKey = getGeminiApiKey();
   if (!apiKey) throw new Error('Gemini API key not configured');
 
   const prompt = getPremiumPrompt(cropFamily, lang, query);
@@ -237,7 +237,7 @@ async function analyzeWithOpenRouter(
   lang: string,
   query?: string,
 ): Promise<AnalysisResult> {
-  const apiKey = getOpenRouterKey();
+  const apiKey = getOpenRouterApiKey();
   if (!apiKey) throw new Error('OpenRouter API key not configured');
 
   const isVision = model.supportsVision && imageBase64;
@@ -395,58 +395,8 @@ export async function analyzeWithHybridModels(
     log.push({ model: 'Cloudflare Worker', status: 'failed', reason: err.message });
   }
 
-  // ── Step 1: Gemini 2.0 Flash direct (fallback if worker down) ──
-  if (imageBase64 && getGeminiKey()) {
-    try {
-      console.log('[HybridAnalyzer] Trying Gemini 2.0 Flash (premium)...');
-      const result = await analyzeWithGemini(imageBase64, mimeType, cropFamily, lang, query);
-      log.push({ model: 'Gemini 2.0 Flash', status: 'success' });
-      return { ...result, attemptLog: log };
-    } catch (err: any) {
-      console.warn('[HybridAnalyzer] Gemini failed:', err.message);
-      log.push({ model: 'Gemini 2.0 Flash', status: 'failed', reason: err.message });
-    }
-  }
-
-  // ── Step 2: Gemini 1.5 Flash via OpenRouter (free, vision) ──
-  if (imageBase64 && getOpenRouterKey()) {
-    try {
-      console.log('[HybridAnalyzer] Trying Gemini 1.5 Flash via OpenRouter (free)...');
-      const result = await analyzeWithOpenRouter(
-        MODELS['gemini-1.5-flash'],
-        imageBase64,
-        mimeType,
-        cropFamily,
-        lang,
-        query,
-      );
-      log.push({ model: 'Gemini 1.5 Flash (OpenRouter)', status: 'success' });
-      return { ...result, attemptLog: log };
-    } catch (err: any) {
-      console.warn('[HybridAnalyzer] OpenRouter Gemini failed:', err.message);
-      log.push({ model: 'Gemini 1.5 Flash (OpenRouter)', status: 'failed', reason: err.message });
-    }
-  }
-
-  // ── Step 3: Llama 3.1 8B via OpenRouter (free, text-only fallback) ──
-  if (getOpenRouterKey()) {
-    try {
-      console.log('[HybridAnalyzer] Trying Llama 3.1 8B via OpenRouter (free, text-only)...');
-      const result = await analyzeWithOpenRouter(
-        MODELS['llama-3.1-8b'],
-        null, // no image - text description only
-        mimeType,
-        cropFamily,
-        lang,
-        query,
-      );
-      log.push({ model: 'Llama 3.1 8B (OpenRouter)', status: 'success' });
-      return { ...result, attemptLog: log };
-    } catch (err: any) {
-      console.warn('[HybridAnalyzer] Llama fallback failed:', err.message);
-      log.push({ model: 'Llama 3.1 8B (OpenRouter)', status: 'failed', reason: err.message });
-    }
-  }
+  // Steps 1-3 removed — keys never stored in APK (security)
+  // All AI calls go through Cloudflare Worker (server-side keys)
 
   // ── Step 4: Rule-based offline analyzer ──
   console.log('[HybridAnalyzer] All API models failed. Using rule-based system...');
@@ -473,7 +423,7 @@ BARI, BRRI, DAE, BARC-এর সুপারিশ অনুসরণ করু�
   } catch {}
 
   // Step 1: Gemini direct fallback
-  if (getGeminiKey()) {
+  if (getGeminiApiKey()) {
     try {
       const contents = [
         ...history.slice(-6).map(h => ({
@@ -484,7 +434,7 @@ BARI, BRRI, DAE, BARC-এর সুপারিশ অনুসরণ করু�
       ];
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${getGeminiKey()}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${getGeminiApiKey()}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -504,7 +454,7 @@ BARI, BRRI, DAE, BARC-এর সুপারিশ অনুসরণ করু�
   }
 
   // Step 2: OpenRouter free model
-  if (getOpenRouterKey()) {
+  if (getOpenRouterApiKey()) {
     try {
       const messages = [
         { role: 'system', content: systemPrompt },
@@ -515,7 +465,7 @@ BARI, BRRI, DAE, BARC-এর সুপারিশ অনুসরণ করু�
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${getOpenRouterKey()}`,
+          Authorization: `Bearer ${getOpenRouterApiKey()}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://krishiai.app',
         },
@@ -551,10 +501,10 @@ export async function searchWithHybridModels(
 [{"title":"শিরোনাম","content":"বিস্তারিত তথ্য","source":"BARI/BRRI/DAE"}]`;
 
   // Try Gemini first
-  if (getGeminiKey()) {
+  if (getGeminiApiKey()) {
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${getGeminiKey()}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${getGeminiApiKey()}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -574,12 +524,12 @@ export async function searchWithHybridModels(
   }
 
   // Fallback to OpenRouter
-  if (getOpenRouterKey()) {
+  if (getOpenRouterApiKey()) {
     try {
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${getOpenRouterKey()}`,
+          Authorization: `Bearer ${getOpenRouterApiKey()}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://krishiai.app',
         },
