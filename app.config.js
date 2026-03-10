@@ -1,15 +1,17 @@
 /**
  * Expo dynamic config
- * Reads API keys from environment at EAS build time
- * Keys come from .env file written by GitHub Actions workflow
+ * API keys come from EAS secrets (set via eas secret:create)
+ * Referenced in eas.json env as $EXPO_PUBLIC_GEMINI_API_KEY
  */
 module.exports = ({ config }) => {
   const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
   const openRouterKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '';
 
-  // Log at build time so we can verify in EAS logs
-  console.log('[app.config.js] GEMINI key present:', geminiKey.length > 10 ? `YES (${geminiKey.slice(0,8)}...)` : 'NO ❌');
-  console.log('[app.config.js] OPENROUTER key present:', openRouterKey.length > 10 ? `YES (${openRouterKey.slice(0,8)}...)` : 'NO');
+  if (geminiKey.length > 10) {
+    console.log(`[app.config.js] GEMINI key: YES (${geminiKey.slice(0, 8)}...)`);
+  } else {
+    console.log('[app.config.js] GEMINI key: NOT SET — app will use Cloudflare Worker only');
+  }
 
   return {
     ...config,
