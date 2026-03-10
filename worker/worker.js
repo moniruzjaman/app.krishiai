@@ -1,28 +1,21 @@
 /**
  * KrishiAI Gateway v3 — Cloudflare Worker
- * HYBRID CROP DOCTOR — Maximum Free Vision Coverage
+ * HYBRID CROP DOCTOR
  *
  * CLASSIFIER cascade (image → label, ~20 tokens):
  *   1. Gemini 2.5 Flash-Lite  — Google      1500/day FREE
  *   2. Gemini 2.5 Flash       — Google      1000/day FREE
  *   3. Gemini 2.0 Flash       — Google      1500/day FREE
- *   4. Kimi K2.5              — NVIDIA NIM  1000 credits FREE signup
- *   5. GLM-4.6V               — Z.AI        free tier
- *   6. llama-4-scout:free     — OpenRouter  200/day FREE
+ *   4. GLM-4.6V               — Z.AI        free tier
+ *   5. llama-4-scout:free     — OpenRouter  200/day FREE
  *
  * ADVISORY cascade (text prompt, ~600 tokens):
  *   1. Gemini 2.5 Flash       — Google      FREE
  *   2. Gemini 2.0 Flash       — Google      FREE
- *   3. Kimi K2.5 (text)       — NVIDIA NIM  FREE credits
- *   4. GLM-4.7                — Z.AI        free tier
- *   5. llama-4-maverick:free  — OpenRouter  FREE
- *   6. deepseek-r1:free       — OpenRouter  FREE
- *   7. qwen-2.5-7b:free       — OpenRouter  FREE
- *
- * New providers vs v2:
- *   + NVIDIA NIM  → Kimi K2.5 vision (free signup credits)
- *   + Z.AI        → GLM-4.6V vision + GLM-4.7 text (free tier)
- *   + Gemini 2.5  → upgraded from 2.0
+ *   3. GLM-4.7                — Z.AI        free tier
+ *   4. llama-4-maverick:free  — OpenRouter  FREE
+ *   5. deepseek-r1:free       — OpenRouter  FREE
+ *   6. qwen-2.5-7b:free       — OpenRouter  FREE
  */
 
 const CORS = {
@@ -32,7 +25,6 @@ const CORS = {
   'Content-Type': 'application/json',
 };
 
-// ── Disease Knowledge Base ────────────────────────────────────────────────────
 const DISEASE_KB = {
   rice_blast: {
     bn: 'ধানের ব্লাস্ট রোগ',
@@ -113,23 +105,17 @@ Reply with ONLY one label from this exact list (no punctuation, no explanation):
 ${DISEASE_LABELS}
 If none match, reply: unknown`;
 
-// ── Helper: OpenAI-compatible vision call ─────────────────────────────────────
+// ── OpenAI-compatible vision call ────────────────────────────────────────────
 async function callVision(baseUrl, apiKey, model, imageBase64, textPrompt, maxTokens = 20) {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
-          { type: 'text', text: textPrompt },
-        ],
-      }],
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+        { type: 'text', text: textPrompt },
+      ]}],
       max_tokens: maxTokens,
       temperature: 0.1,
     }),
@@ -137,19 +123,15 @@ async function callVision(baseUrl, apiKey, model, imageBase64, textPrompt, maxTo
   if (!res.ok) throw new Error(`${model} ${res.status}`);
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error(`${model} empty response`);
+  if (!text) throw new Error(`${model} empty`);
   return text;
 }
 
-// ── Helper: OpenAI-compatible text call ──────────────────────────────────────
+// ── OpenAI-compatible text call ──────────────────────────────────────────────
 async function callText(baseUrl, apiKey, model, prompt, maxTokens = 600, extraHeaders = {}) {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      ...extraHeaders,
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: prompt }],
@@ -164,7 +146,7 @@ async function callText(baseUrl, apiKey, model, prompt, maxTokens = 600, extraHe
   return { text, model };
 }
 
-// ── Gemini native call (vision or text) ──────────────────────────────────────
+// ── Gemini native call ───────────────────────────────────────────────────────
 async function callGemini(model, prompt, imageBase64, apiKey, maxTokens = 600) {
   const parts = imageBase64
     ? [{ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
@@ -187,57 +169,32 @@ async function callGemini(model, prompt, imageBase64, apiKey, maxTokens = 600) {
   return text;
 }
 
-// ── Step 1: Classify disease from image ──────────────────────────────────────
+// ── Step 1: Classify disease ─────────────────────────────────────────────────
 async function classifyDisease(imageBase64, cropHint, env) {
   const prompt = CLASSIFY_PROMPT.replace('{crop}', cropHint || 'unknown');
 
   const attempts = [
-    // 1. Gemini 2.5 Flash-Lite — 1500/day free
     async () => {
       const text = await callGemini('gemini-2.5-flash-lite-preview-06-17', prompt, imageBase64, env.GEMINI_API_KEY, 15);
       return { text, model: 'gemini-2.5-flash-lite' };
     },
-    // 2. Gemini 2.5 Flash — 1000/day free
     async () => {
       const text = await callGemini('gemini-2.5-flash-preview-05-20', prompt, imageBase64, env.GEMINI_API_KEY, 15);
       return { text, model: 'gemini-2.5-flash' };
     },
-    // 3. Gemini 2.0 Flash — reliable fallback
     async () => {
       const text = await callGemini('gemini-2.0-flash', prompt, imageBase64, env.GEMINI_API_KEY, 15);
       return { text, model: 'gemini-2.0-flash' };
     },
-    // 4. Kimi K2.5 — NVIDIA NIM (1000 free credits on signup)
-    async () => {
-      if (!env.NVIDIA_API_KEY) throw new Error('no NVIDIA key');
-      const text = await callVision(
-        'https://integrate.api.nvidia.com/v1',
-        env.NVIDIA_API_KEY,
-        'moonshotai/kimi-k2.5',
-        imageBase64, prompt, 15
-      );
-      return { text, model: 'kimi-k2.5' };
-    },
-    // 5. GLM-4.6V — Z.AI free tier
     async () => {
       if (!env.ZAI_API_KEY) throw new Error('no ZAI key');
-      const text = await callVision(
-        'https://api.z.ai/v1',
-        env.ZAI_API_KEY,
-        'glm-4.6v',
-        imageBase64, prompt, 15
-      );
+      const text = await callVision('https://api.z.ai/v1', env.ZAI_API_KEY, 'glm-4.6v', imageBase64, prompt, 15);
       return { text, model: 'glm-4.6v' };
     },
-    // 6. Llama 4 Scout — OpenRouter free
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
-      const text = await callVision(
-        'https://openrouter.ai/api/v1',
-        env.OPENROUTER_API_KEY,
-        'meta-llama/llama-4-scout:free',
-        imageBase64, prompt, 15
-      );
+      const text = await callVision('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
+        'meta-llama/llama-4-scout:free', imageBase64, prompt, 15);
       return { text, model: 'llama-4-scout' };
     },
   ];
@@ -250,56 +207,42 @@ async function classifyDisease(imageBase64, cropHint, env) {
       if (match) return { diseaseKey: match, classifierModel: model };
     } catch (e) {}
   }
-
   return { diseaseKey: 'unknown', classifierModel: 'none' };
 }
 
-// ── Step 2: Generate advisory ─────────────────────────────────────────────────
+// ── Step 2: Advisory ─────────────────────────────────────────────────────────
 async function getAdvisory(diseaseKey, crop, imageBase64, env) {
   const disease = DISEASE_KB[diseaseKey];
   const prompt = disease
     ? disease.prompt.replace('{crop}', crop || 'ফসল')
-    : `ফসল: ${crop || 'অজানা'}। এই ফসলের ছবি দেখে রোগ/পোকা শনাক্ত করুন। বাংলাদেশ DAE/BARI/BRRI সুপারিশ অনুযায়ী সহজ বাংলায় পরামর্শ দিন। ১৫০ শব্দ।`;
-
-  // For unknown: include image. For known: text-only (80% cheaper)
+    : `ফসল: ${crop || 'অজানা'}। এই ফসলের ছবি দেখে রোগ/পোকা শনাক্ত করুন। DAE/BARI/BRRI সুপারিশ অনুযায়ী সহজ বাংলায় পরামর্শ দিন। ১৫০ শব্দ।`;
   const useImage = diseaseKey === 'unknown' && imageBase64;
 
   const attempts = [
-    // 1. Gemini 2.5 Flash
     async () => {
       const text = await callGemini('gemini-2.5-flash-preview-05-20', prompt, useImage ? imageBase64 : null, env.GEMINI_API_KEY, 700);
       return { text, model: 'gemini-2.5-flash' };
     },
-    // 2. Gemini 2.0 Flash
     async () => {
       const text = await callGemini('gemini-2.0-flash', prompt, useImage ? imageBase64 : null, env.GEMINI_API_KEY, 700);
       return { text, model: 'gemini-2.0-flash' };
     },
-    // 3. Kimi K2.5 text — NVIDIA NIM
-    async () => {
-      if (!env.NVIDIA_API_KEY) throw new Error('no NVIDIA key');
-      return callText('https://integrate.api.nvidia.com/v1', env.NVIDIA_API_KEY, 'moonshotai/kimi-k2.5', prompt, 700);
-    },
-    // 4. GLM-4.7 text — Z.AI
     async () => {
       if (!env.ZAI_API_KEY) throw new Error('no ZAI key');
       return callText('https://api.z.ai/v1', env.ZAI_API_KEY, 'glm-4.7', prompt, 700);
     },
-    // 5. Llama 4 Maverick — OpenRouter
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
       return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
         'meta-llama/llama-4-maverick:free', prompt, 700,
         { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
     },
-    // 6. DeepSeek R1 — OpenRouter
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
       return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
         'deepseek/deepseek-r1:free', prompt, 700,
         { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
     },
-    // 7. Qwen 2.5 7B — OpenRouter
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
       return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
@@ -314,48 +257,42 @@ async function getAdvisory(diseaseKey, crop, imageBase64, env) {
       if (result?.text) return result;
     } catch (e) {}
   }
-
   throw new Error('All advisory providers failed');
 }
 
-// ── Chat handler (text only) ──────────────────────────────────────────────────
+// ── Chat ─────────────────────────────────────────────────────────────────────
 async function handleChat(prompt, env) {
-  const sys = `আপনি কৃষি AI — বাংলাদেশের কৃষকদের বিশেষজ্ঞ। BARI, BRRI, DAE, BARC সুপারিশ মেনে সহজ বাংলায় উত্তর দিন।`;
-  const fullPrompt = `${sys}\n\n${prompt}`;
+  const full = `আপনি কৃষি AI — বাংলাদেশের কৃষকদের বিশেষজ্ঞ। BARI, BRRI, DAE, BARC সুপারিশ মেনে সহজ বাংলায় উত্তর দিন।\n\n${prompt}`;
 
   const attempts = [
     async () => {
-      const text = await callGemini('gemini-2.5-flash-preview-05-20', fullPrompt, null, env.GEMINI_API_KEY, 800);
+      const text = await callGemini('gemini-2.5-flash-preview-05-20', full, null, env.GEMINI_API_KEY, 800);
       return { text, model: 'gemini-2.5-flash' };
     },
     async () => {
-      const text = await callGemini('gemini-2.0-flash', fullPrompt, null, env.GEMINI_API_KEY, 800);
+      const text = await callGemini('gemini-2.0-flash', full, null, env.GEMINI_API_KEY, 800);
       return { text, model: 'gemini-2.0-flash' };
     },
     async () => {
-      if (!env.NVIDIA_API_KEY) throw new Error('no NVIDIA key');
-      return callText('https://integrate.api.nvidia.com/v1', env.NVIDIA_API_KEY, 'moonshotai/kimi-k2.5', fullPrompt, 800);
-    },
-    async () => {
       if (!env.ZAI_API_KEY) throw new Error('no ZAI key');
-      return callText('https://api.z.ai/v1', env.ZAI_API_KEY, 'glm-4.7', fullPrompt, 800);
+      return callText('https://api.z.ai/v1', env.ZAI_API_KEY, 'glm-4.7', full, 800);
     },
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
       return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
-        'meta-llama/llama-4-maverick:free', fullPrompt, 800,
+        'meta-llama/llama-4-maverick:free', full, 800,
         { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
     },
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
       return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
-        'deepseek/deepseek-r1:free', fullPrompt, 800,
+        'deepseek/deepseek-r1:free', full, 800,
         { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
     },
     async () => {
       if (!env.OPENROUTER_API_KEY) throw new Error('no OR key');
       return callText('https://openrouter.ai/api/v1', env.OPENROUTER_API_KEY,
-        'qwen/qwen-2.5-7b-instruct:free', fullPrompt, 800,
+        'qwen/qwen-2.5-7b-instruct:free', full, 800,
         { 'HTTP-Referer': 'https://krishiai.live', 'X-Title': 'KrishiAI' });
     },
   ];
@@ -366,11 +303,10 @@ async function handleChat(prompt, env) {
       if (result?.text) return result;
     } catch (e) {}
   }
-
-  throw new Error('All chat providers failed');
+  throw new Error('All providers failed');
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -379,18 +315,16 @@ export default {
       return new Response(JSON.stringify({
         status: 'ok',
         service: 'KrishiAI Gateway v3',
-        version: '3.0.0',
-        architecture: 'hybrid-crop-doctor',
-        classifier_cascade: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash', 'kimi-k2.5', 'glm-4.6v', 'llama-4-scout'],
-        advisory_cascade: ['gemini-2.5-flash', 'gemini-2.0-flash', 'kimi-k2.5', 'glm-4.7', 'llama-4-maverick', 'deepseek-r1', 'qwen-2.5-7b'],
+        version: '3.1.0',
+        classifier_cascade: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash', 'glm-4.6v', 'llama-4-scout'],
+        advisory_cascade: ['gemini-2.5-flash', 'gemini-2.0-flash', 'glm-4.7', 'llama-4-maverick', 'deepseek-r1', 'qwen-2.5-7b'],
         diseases_covered: Object.keys(DISEASE_KB).length,
         timestamp: new Date().toISOString(),
       }), { headers: CORS });
     }
 
-    if (request.method !== 'POST') {
+    if (request.method !== 'POST')
       return new Response(JSON.stringify({ error: 'POST required' }), { status: 405, headers: CORS });
-    }
 
     let body;
     try { body = await request.json(); }
@@ -398,16 +332,14 @@ export default {
 
     const { prompt, imageBase64, cropHint } = body;
 
-    // Chat mode or local-classify advisory mode
+    // skipClassify — local model already classified, just get advisory
     if (!imageBase64) {
-      // skipClassify: local model already identified disease, just get advisory
       if (body.skipClassify && body.cropHint) {
         try {
           const diseaseKey = Object.keys(DISEASE_KB).includes(body.cropHint) ? body.cropHint : 'unknown';
           const { text, model } = await getAdvisory(diseaseKey, body.cropHint, null, env);
           return new Response(JSON.stringify({
-            text, model,
-            diseaseKey,
+            text, model, diseaseKey,
             diseaseName: DISEASE_KB[diseaseKey]?.bn || 'অজানা রোগ',
             architecture: 'local-classify+cloud-advisory',
           }), { headers: CORS });
@@ -415,7 +347,8 @@ export default {
           return new Response(JSON.stringify({ error: err.message }), { status: 503, headers: CORS });
         }
       }
-      if (!prompt?.trim()) return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400, headers: CORS });
+      if (!prompt?.trim())
+        return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400, headers: CORS });
       try {
         const result = await handleChat(prompt.trim(), env);
         return new Response(JSON.stringify(result), { headers: CORS });
@@ -425,7 +358,6 @@ export default {
     }
 
     // Diagnose mode — hybrid 2-step
-    // skipClassify: app already classified locally, skip Step 1
     try {
       let diseaseKey, classifierModel;
       if (body.skipClassify && body.cropHint && Object.keys(DISEASE_KB).includes(body.cropHint)) {
@@ -435,20 +367,14 @@ export default {
         ({ diseaseKey, classifierModel } = await classifyDisease(imageBase64, cropHint || prompt, env));
       }
       const { text, model: advisoryModel } = await getAdvisory(diseaseKey, cropHint || prompt || 'ফসল', imageBase64, env);
-
       return new Response(JSON.stringify({
-        text,
-        model: advisoryModel,
-        classifierModel,
-        diseaseKey,
+        text, model: advisoryModel, classifierModel, diseaseKey,
         diseaseName: DISEASE_KB[diseaseKey]?.bn || 'অজানা রোগ',
         architecture: 'hybrid-2step-v3',
       }), { headers: CORS });
-
     } catch (err) {
       return new Response(JSON.stringify({
-        error: 'সব AI প্রদানকারী অনুপলব্ধ।',
-        detail: err.message,
+        error: 'সব AI প্রদানকারী অনুপলব্ধ।', detail: err.message,
       }), { status: 503, headers: CORS });
     }
   },
