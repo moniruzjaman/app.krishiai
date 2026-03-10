@@ -4,4 +4,4 @@ compatibility_date = "2025-01-01"
 account_id = "4a2230e358905ad039e6ee0014fc9ce1"
 
 [vars]
-SERVICE_NAME = "KrishiAI Gateway v2"
+SERVICE_NAME = "KrishiAI Gateway v3"
