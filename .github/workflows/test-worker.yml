@@ -1,6 +1,11 @@
 name: 🧪 Test Worker API
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/worker.js'
+      - 'worker/wrangler.toml'
   workflow_dispatch:
 
 jobs:
@@ -10,15 +15,40 @@ jobs:
       - name: 🌾 Test health check
         run: |
           echo "=== Health Check ===" 
-          curl -s https://app-krishiai.mithun-hstu.workers.dev | python3 -m json.tool
+          HEALTH=$(curl -s -D /tmp/headers.txt https://app-krishiai.mithun-hstu.workers.dev)
+          echo "$HEALTH" | python3 -m json.tool
+          echo "=== Response headers ==="
+          cat /tmp/headers.txt
+          HEALTH_JSON="$HEALTH" python3 - <<'PY'
+import json, os
+data=json.loads(os.environ["HEALTH_JSON"])
+assert data.get("status")=="ok", "health status is not ok"
+assert data.get("requestId"), "requestId missing in health response"
+print("health schema ok")
+PY
 
       - name: 🔬 Test AI text query
         run: |
           echo "=== AI Text Query ==="
-          curl -s -X POST https://app-krishiai.mithun-hstu.workers.dev \
+          RESP=$(curl -s -X POST https://app-krishiai.mithun-hstu.workers.dev \
             -H "Content-Type: application/json" \
             -d '{"prompt":"ধান পাতায় বাদামী দাগ কেন হয়? সমাধান কী?"}' \
-            | python3 -m json.tool
+          )
+          echo "$RESP" | python3 -m json.tool
+          RESP_JSON="$RESP" python3 - <<'PY'
+import json, os
+data=json.loads(os.environ["RESP_JSON"])
+if data.get("ok") is False:
+    # structured error path
+    required=["code","stage","requestId","error"]
+    missing=[k for k in required if not data.get(k)]
+    assert not missing, f"structured error missing fields: {missing}"
+else:
+    required=["text","model","requestId"]
+    missing=[k for k in required if not data.get(k)]
+    assert not missing, f"success response missing fields: {missing}"
+print("chat schema ok")
+PY
 
       - name: ✅ Summary
         run: echo "Worker test complete!"

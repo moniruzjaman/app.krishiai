@@ -6,15 +6,24 @@ import { useState, useEffect, useCallback } from 'react';
 
 // ── Offline check via worker ping ────────────────────────────────────────────
 export async function checkOnline(): Promise<boolean> {
-  try {
-    const res = await fetch('https://app-krishiai.mithun-hstu.workers.dev', {
-      method: 'GET',
-      signal: AbortSignal.timeout(4000),
-    });
-    return res.status < 500;
-  } catch {
-    return false;
+  const probes = [
+    'https://app-krishiai.mithun-hstu.workers.dev', // primary AI gateway
+    'https://api.open-meteo.com/v1/forecast?latitude=23.81&longitude=90.41&current=temperature_2m', // weather backend
+    'https://clients3.google.com/generate_204', // generic connectivity probe
+  ];
+
+  for (const url of probes) {
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        signal: AbortSignal.timeout(4000),
+      });
+      if (res.ok || (res.status >= 200 && res.status < 500)) return true;
+    } catch {
+      // try next probe
+    }
   }
+  return false;
 }
 
 export function useNetworkStatus() {

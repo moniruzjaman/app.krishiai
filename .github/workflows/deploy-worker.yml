@@ -22,3 +22,37 @@ jobs:
           workingDirectory: worker
           wranglerVersion: '3.114.4'
           command: deploy worker.js --name app-krishiai --compatibility-date 2025-01-01
+
+      - name: 🌾 Post-deploy health smoke test
+        run: |
+          set -euo pipefail
+          HEALTH=$(curl -sS https://app-krishiai.mithun-hstu.workers.dev)
+          echo "$HEALTH" | python3 -m json.tool
+          HEALTH_JSON="$HEALTH" python3 - <<'PY'
+import json, os
+data=json.loads(os.environ["HEALTH_JSON"])
+assert data.get("status")=="ok", "health status is not ok"
+assert data.get("requestId"), "requestId missing"
+print("health smoke passed")
+PY
+
+      - name: 🔬 Post-deploy chat smoke test
+        run: |
+          set -euo pipefail
+          RESP=$(curl -sS -X POST https://app-krishiai.mithun-hstu.workers.dev \
+            -H "Content-Type: application/json" \
+            -d '{"prompt":"ধান পাতায় বাদামী দাগ কেন হয়? সংক্ষেপে বলুন।"}')
+          echo "$RESP" | python3 -m json.tool
+          RESP_JSON="$RESP" python3 - <<'PY'
+import json, os
+data=json.loads(os.environ["RESP_JSON"])
+if data.get("ok") is False:
+    req=["code","stage","requestId","error"]
+    miss=[k for k in req if not data.get(k)]
+    assert not miss, f"error schema missing fields: {miss}"
+else:
+    req=["text","model","requestId"]
+    miss=[k for k in req if not data.get(k)]
+    assert not miss, f"success schema missing fields: {miss}"
+print("chat smoke passed")
+PY

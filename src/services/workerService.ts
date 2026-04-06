@@ -35,7 +35,9 @@ export async function diagnoseWithWorker(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as any;
-    throw new Error(err?.error || `Worker error ${res.status}`);
+    const requestId = err?.requestId || res.headers.get('X-Request-Id');
+    const detail = err?.code ? `${err.code}: ${err?.error || 'Worker failed'}` : (err?.error || `Worker error ${res.status}`);
+    throw new Error(requestId ? `${detail} [requestId:${requestId}]` : detail);
   }
   return res.json() as Promise<WorkerResponse>;
 }
@@ -49,7 +51,9 @@ export async function chatWithWorker(prompt: string): Promise<WorkerResponse> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as any;
-    throw new Error(err?.error || `Worker error ${res.status}`);
+    const requestId = err?.requestId || res.headers.get('X-Request-Id');
+    const detail = err?.code ? `${err.code}: ${err?.error || 'Worker failed'}` : (err?.error || `Worker error ${res.status}`);
+    throw new Error(requestId ? `${detail} [requestId:${requestId}]` : detail);
   }
   return res.json() as Promise<WorkerResponse>;
 }

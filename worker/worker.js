@@ -20,10 +20,44 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json',
 };
+
+
+const TIMEOUTS = {
+  classifyMs: 5000,
+  advisoryMs: 8000,
+  chatMs: 8000,
+};
+
+function withTimeout(promise, ms, label = 'timeout') {
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error(`${label} after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
+function json(data, status = 200, requestId) {
+  const headers = { ...CORS };
+  if (requestId) headers['X-Request-Id'] = requestId;
+  return new Response(JSON.stringify(data), { status, headers });
+}
+
+function errPayload({ code, stage, provider, model, message, requestId, retryable = true }) {
+  return {
+    ok: false,
+    code,
+    stage,
+    provider,
+    model,
+    retryable,
+    requestId,
+    error: message,
+  };
+}
 
 const DISEASE_KB = {
   rice_blast: {
@@ -201,7 +235,7 @@ async function classifyDisease(imageBase64, cropHint, env) {
 
   for (const attempt of attempts) {
     try {
-      const { text, model } = await attempt();
+      const { text, model } = await withTimeout(attempt(), TIMEOUTS.classifyMs, 'classify timeout');
       const raw = text.toLowerCase().replace(/[^a-z_]/g, '');
       const match = Object.keys(DISEASE_KB).find(k => raw === k || raw.includes(k));
       if (match) return { diseaseKey: match, classifierModel: model };
@@ -253,7 +287,7 @@ async function getAdvisory(diseaseKey, crop, imageBase64, env) {
 
   for (const attempt of attempts) {
     try {
-      const result = await attempt();
+      const result = await withTimeout(attempt(), TIMEOUTS.advisoryMs, 'advisory timeout');
       if (result?.text) return result;
     } catch (e) {}
   }
@@ -299,7 +333,7 @@ async function handleChat(prompt, env) {
 
   for (const attempt of attempts) {
     try {
-      const result = await attempt();
+      const result = await withTimeout(attempt(), TIMEOUTS.chatMs, 'chat timeout');
       if (result?.text) return result;
     } catch (e) {}
   }
@@ -309,10 +343,12 @@ async function handleChat(prompt, env) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default {
   async fetch(request, env) {
+    const requestId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     if (request.method === 'GET') {
-      return new Response(JSON.stringify({
+      return json({
+        ok: true,
         status: 'ok',
         service: 'KrishiAI Gateway v3',
         version: '3.1.0',
@@ -320,15 +356,34 @@ export default {
         advisory_cascade: ['gemini-2.5-flash', 'gemini-2.0-flash', 'glm-4.7', 'llama-4-maverick', 'deepseek-r1', 'qwen-2.5-7b'],
         diseases_covered: Object.keys(DISEASE_KB).length,
         timestamp: new Date().toISOString(),
-      }), { headers: CORS });
+        requestId,
+      }, 200, requestId);
     }
 
     if (request.method !== 'POST')
-      return new Response(JSON.stringify({ error: 'POST required' }), { status: 405, headers: CORS });
+      return json(errPayload({
+        code: 'METHOD_NOT_ALLOWED',
+        stage: 'request',
+        provider: 'gateway',
+        model: 'none',
+        message: 'POST required',
+        requestId,
+        retryable: false,
+      }), 405, requestId);
 
     let body;
     try { body = await request.json(); }
-    catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: CORS }); }
+    catch {
+      return json(errPayload({
+        code: 'INVALID_JSON',
+        stage: 'request',
+        provider: 'gateway',
+        model: 'none',
+        message: 'Invalid JSON',
+        requestId,
+        retryable: false,
+      }), 400, requestId);
+    }
 
     const { prompt, imageBase64, cropHint } = body;
 
@@ -338,22 +393,45 @@ export default {
         try {
           const diseaseKey = Object.keys(DISEASE_KB).includes(body.cropHint) ? body.cropHint : 'unknown';
           const { text, model } = await getAdvisory(diseaseKey, body.cropHint, null, env);
-          return new Response(JSON.stringify({
+          return json({
             text, model, diseaseKey,
             diseaseName: DISEASE_KB[diseaseKey]?.bn || 'অজানা রোগ',
             architecture: 'local-classify+cloud-advisory',
-          }), { headers: CORS });
+            requestId,
+          }, 200, requestId);
         } catch (err) {
-          return new Response(JSON.stringify({ error: err.message }), { status: 503, headers: CORS });
+          return json(errPayload({
+            code: 'ADVISORY_PROVIDER_FAILED',
+            stage: 'advisory',
+            provider: 'multi',
+            model: 'cascade',
+            message: err.message,
+            requestId,
+          }), 503, requestId);
         }
       }
       if (!prompt?.trim())
-        return new Response(JSON.stringify({ error: 'prompt required' }), { status: 400, headers: CORS });
+        return json(errPayload({
+          code: 'PROMPT_REQUIRED',
+          stage: 'request',
+          provider: 'gateway',
+          model: 'none',
+          message: 'prompt required',
+          requestId,
+          retryable: false,
+        }), 400, requestId);
       try {
         const result = await handleChat(prompt.trim(), env);
-        return new Response(JSON.stringify(result), { headers: CORS });
+        return json({ ...result, requestId }, 200, requestId);
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 503, headers: CORS });
+        return json(errPayload({
+          code: 'CHAT_PROVIDER_FAILED',
+          stage: 'chat',
+          provider: 'multi',
+          model: 'cascade',
+          message: err.message,
+          requestId,
+        }), 503, requestId);
       }
     }
 
@@ -367,15 +445,21 @@ export default {
         ({ diseaseKey, classifierModel } = await classifyDisease(imageBase64, cropHint || prompt, env));
       }
       const { text, model: advisoryModel } = await getAdvisory(diseaseKey, cropHint || prompt || 'ফসল', imageBase64, env);
-      return new Response(JSON.stringify({
+      return json({
         text, model: advisoryModel, classifierModel, diseaseKey,
         diseaseName: DISEASE_KB[diseaseKey]?.bn || 'অজানা রোগ',
         architecture: 'hybrid-2step-v3',
-      }), { headers: CORS });
+        requestId,
+      }, 200, requestId);
     } catch (err) {
-      return new Response(JSON.stringify({
-        error: 'সব AI প্রদানকারী অনুপলব্ধ।', detail: err.message,
-      }), { status: 503, headers: CORS });
+      return json(errPayload({
+        code: 'DIAGNOSE_PROVIDER_FAILED',
+        stage: 'diagnose',
+        provider: 'multi',
+        model: 'cascade',
+        message: `সব AI প্রদানকারী অনুপলব্ধ। ${err.message || ''}`.trim(),
+        requestId,
+      }), 503, requestId);
     }
   },
 };
