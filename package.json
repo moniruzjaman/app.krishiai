@@ -1,5 +1,5 @@
 {
-  "name": "greenloop-cirdap",
+  "name": "app.krishiai",
   "version": "1.0.0",
   "description": "GreenLoop 3.0 - CIRDAP Rural Development Innovation Challenge 2026. A circular economy solution for Bangladesh's LDC graduation.",
   "main": "docs/index.html",
@@ -21,10 +21,10 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/moniruzjaman/cirdap-greenloop3.0.git"
+    "url": "https://github.com/moniruzjaman/app.krishiai.git"
   },
   "bugs": {
-    "url": "https://github.com/moniruzjaman/cirdap-greenloop3.0/issues"
+    "url": "https://github.com/moniruzjaman/app.krishiai/issues"
   },
-  "homepage": "https://github.com/moniruzjaman/cirdap-greenloop3.0#readme"
+  "homepage": "https://github.com/moniruzjaman/app.krishiai#readme"
 }
